@@ -90,3 +90,24 @@ pub fn Document::find_all(
   }
   Ok(matches)
 }
+
+///|
+/// Locate a candidate and classify whether evidence is unique, ambiguous, or absent.
+#warnings("-result_error_return")
+pub fn Document::locate(
+  self : Document,
+  candidate : String,
+) -> Result[MatchResult, MatchError] {
+  let matches = match self.find_all(candidate) {
+    Ok(found) => found
+    Err(error) => return Err(error)
+  }
+  let status = if matches.length() == 0 {
+    Missing
+  } else if matches.length() == 1 {
+    Unique
+  } else {
+    Ambiguous
+  }
+  Ok(MatchResult::{ status, matches, })
+}
