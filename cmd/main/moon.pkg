@@ -1,0 +1,5 @@
+// import {
+//   "Atman-Angle/moonextract" @lib,
+// }
+
+pkgtype(kind: "executable")
