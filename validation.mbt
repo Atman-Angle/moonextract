@@ -1,10 +1,15 @@
 ///|
 /// Recoverable errors raised when extraction data disagrees with its source.
 pub(all) suberror ValidationError {
+  EmptyField
+  EmptyValue
+  InvalidValue
+  StatusMismatch(MatchStatus, MatchStatus)
+  StatusEvidenceCountMismatch(Int32, Int32)
   WrongDocumentId(Int32, String, String)
   InvalidEvidenceSpan(Int32, Int32, Int32)
+  EvidenceSpanMismatch(Int32, Int32, Int32, Int32, Int32)
   EvidenceTextMismatch(Int32, String, String)
-  StatusEvidenceCountMismatch(Int32, Int32)
   DuplicateEvidenceSpan(Int32, Int32)
   ValueEvidenceMismatch(String, String)
 }
@@ -12,52 +17,69 @@ pub(all) suberror ValidationError {
 ///|
 /// Check that an extraction is internally consistent with its document.
 ///
-/// Validation proves textual support only; it never promotes a located span to
-/// a semantic truth claim.
+/// Validation recomputes the complete expected match set from the source
+/// document, then compares status, count, document id, span, verbatim text,
+/// and source order. It proves textual support only; it never promotes a
+/// located span to a semantic truth claim.
 #warnings("-result_error_return")
 pub fn validate_extraction(
   document : Document,
   extraction : Extraction,
 ) -> Result[Unit, ValidationError] {
-  let count = extraction.evidence.length()
-  let count_valid = match extraction.status {
-    Unique => count == 1
-    Ambiguous => count >= 2
-    Missing => count == 0
+  if extraction.field.is_blank() {
+    return Err(EmptyField)
   }
-  if !count_valid {
-    let expected = match extraction.status {
-      Unique => 1
-      Ambiguous => 2
-      Missing => 0
-    }
-    return Err(StatusEvidenceCountMismatch(expected, count))
+  if extraction.value.is_empty() {
+    return Err(EmptyValue)
   }
-  let length = document.char_length()
-  for index = 0; index < count; index = index + 1 {
+  let located = match document.locate(extraction.value) {
+    Ok(result) => result
+    Err(MatchError::InvalidCandidate) => return Err(InvalidValue)
+    Err(MatchError::EmptyCandidate) => return Err(EmptyValue)
+  }
+  let expected_count = located.matches.length()
+  let actual_count = extraction.evidence.length()
+  if extraction.status != located.status {
+    return Err(StatusMismatch(located.status, extraction.status))
+  }
+  if actual_count != expected_count {
+    return Err(StatusEvidenceCountMismatch(expected_count, actual_count))
+  }
+  let seen : Map[(Int32, Int32), Unit] = Map([])
+  for index = 0; index < actual_count; index = index + 1 {
     let evidence = extraction.evidence[index]
+    let expected = located.matches[index]
     if evidence.document_id != document.id {
       return Err(WrongDocumentId(index, document.id, evidence.document_id))
     }
     let span = evidence.span
-    if span.start < 0 || span.end <= span.start || span.end > length {
+    if span.start < 0 ||
+      span.end <= span.start ||
+      span.end > document.char_length() {
       return Err(InvalidEvidenceSpan(index, span.start, span.end))
     }
-    let verbatim = match document.slice(span) {
-      Ok(text) => text
-      Err(_) => return Err(InvalidEvidenceSpan(index, span.start, span.end))
+    let key = (span.start, span.end)
+    if seen.contains(key) {
+      return Err(DuplicateEvidenceSpan(span.start, span.end))
     }
-    if evidence.text != verbatim {
-      return Err(EvidenceTextMismatch(index, verbatim, evidence.text))
+    seen.set(key, ())
+    let expected_span = expected.span
+    if span.start != expected_span.start || span.end != expected_span.end {
+      return Err(
+        EvidenceSpanMismatch(
+          index,
+          expected_span.start,
+          expected_span.end,
+          span.start,
+          span.end,
+        ),
+      )
+    }
+    if evidence.text != expected.text {
+      return Err(EvidenceTextMismatch(index, expected.text, evidence.text))
     }
     if evidence.text != extraction.value {
       return Err(ValueEvidenceMismatch(extraction.value, evidence.text))
-    }
-    for earlier = 0; earlier < index; earlier = earlier + 1 {
-      let previous = extraction.evidence[earlier].span
-      if previous.start == span.start && previous.end == span.end {
-        return Err(DuplicateEvidenceSpan(previous.start, previous.end))
-      }
     }
   }
   Ok(())

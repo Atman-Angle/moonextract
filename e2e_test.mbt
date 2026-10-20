@@ -1,18 +1,22 @@
 ///|
-test "end-to-end contract extraction keeps verbatim evidence" {
-  let document = match
-    @moonextract.Document::new(
-      "contract-e2e", "合同编号：HT-001\n甲方：示例公司\n签署地：上海",
-    ) {
+fn e2e_test_document(id : String, text : String) -> @moonextract.Document raise {
+  match @moonextract.Document::new(id, text) {
     Ok(document) => document
-    Err(_) => fail("document should be valid")
+    Err(_) => fail("test document should be valid")
   }
+}
+
+///|
+test "end-to-end contract extraction keeps verbatim evidence" {
+  let document = e2e_test_document(
+    "contract-e2e", "合同编号：HT-001\n甲方：示例公司\n签署地：上海",
+  )
   let extraction = match
     document.extract("party", "示例公司", "示例公司") {
     Ok(extraction) => extraction
     Err(_) => fail("extraction should succeed")
   }
-  match extraction.status {
+  match extraction.status() {
     @moonextract.MatchStatus::Unique => ()
     _ => fail("contract party should be unique")
   }
@@ -27,19 +31,18 @@ test "end-to-end contract extraction keeps verbatim evidence" {
 
 ///|
 test "end-to-end resume extraction preserves ambiguity" {
-  let document = @moonextract.Document::{
-    id: "resume-e2e",
-    text: "工作经历：A公司\n项目经历：A公司",
-  }
+  let document = e2e_test_document(
+    "resume-e2e", "工作经历：A公司\n项目经历：A公司",
+  )
   let extraction = match document.extract_normalized("company", "A公司") {
     Ok(extraction) => extraction
     Err(_) => fail("ambiguous extraction should succeed")
   }
-  match extraction.status {
+  match extraction.status() {
     @moonextract.MatchStatus::Ambiguous => ()
     _ => fail("repeated company should be ambiguous")
   }
-  assert_eq(extraction.evidence.length(), 2)
+  assert_eq(extraction.evidence().length(), 2)
   match @moonextract.validate_extraction(document, extraction) {
     Ok(_) => ()
     Err(_) => fail("ambiguous extraction should still validate")
@@ -48,19 +51,18 @@ test "end-to-end resume extraction preserves ambiguity" {
 
 ///|
 test "end-to-end technical document supports missing evidence" {
-  let document = @moonextract.Document::{
-    id: "manual-e2e",
-    text: "版本：1.0\n接口：GET /health",
-  }
+  let document = e2e_test_document(
+    "manual-e2e", "版本：1.0\n接口：GET /health",
+  )
   let extraction = match document.extract_normalized("version", "2.0") {
     Ok(extraction) => extraction
     Err(_) => fail("missing evidence is a normal outcome")
   }
-  match extraction.status {
+  match extraction.status() {
     @moonextract.MatchStatus::Missing => ()
     _ => fail("version 2.0 is absent from the manual")
   }
-  assert_eq(extraction.evidence.length(), 0)
+  assert_eq(extraction.evidence().length(), 0)
   match @moonextract.validate_extraction(document, extraction) {
     Ok(_) => ()
     Err(_) => fail("missing extraction should validate structurally")
@@ -72,10 +74,9 @@ test "end-to-end technical document supports missing evidence" {
 
 ///|
 test "end-to-end chunk mapping agrees with document globals" {
-  let document = @moonextract.Document::{
-    id: "emoji-e2e",
-    text: "说明😀：甲方向乙方付款",
-  }
+  let document = e2e_test_document(
+    "emoji-e2e", "说明😀：甲方向乙方付款",
+  )
   let chunks = match document.chunks(4) {
     Ok(chunks) => chunks
     Err(_) => fail("chunking should succeed")
@@ -83,20 +84,17 @@ test "end-to-end chunk mapping agrees with document globals" {
   let mut found = false
   for index = 0; index < chunks.length(); index = index + 1 {
     let chunk = chunks[index]
-    let chunk_document = @moonextract.Document::{
-      id: document.id,
-      text: chunk.text,
-    }
+    let chunk_document = e2e_test_document(document.id(), chunk.text())
     match chunk_document.find_first("甲方") {
       Ok(Some(local_evidence)) => {
-        let local_start = local_evidence.span.start
-        let local_end = local_evidence.span.end
+        let local_start = local_evidence.span().start()
+        let local_end = local_evidence.span().end()
         let global = match chunk.to_global(local_start, local_end) {
           Ok(span) => span
           Err(_) => fail("local span should map")
         }
-        assert_eq(global.start, 4)
-        assert_eq(global.end, 6)
+        assert_eq(global.start(), 4)
+        assert_eq(global.end(), 6)
         match document.slice(global) {
           Ok(text) => assert_eq(text, "甲方")
           Err(_) => fail("global span should slice")
@@ -111,10 +109,7 @@ test "end-to-end chunk mapping agrees with document globals" {
 
 ///|
 test "end-to-end json output round-trips through the core parser" {
-  let document = @moonextract.Document::{
-    id: "unicode-e2e",
-    text: "状态：😀通过",
-  }
+  let document = e2e_test_document("unicode-e2e", "状态：😀通过")
   let extraction = match document.extract("status", "😀通过", "通过") {
     Ok(extraction) => extraction
     Err(_) => fail("emoji extraction should succeed")

@@ -14,6 +14,7 @@ pub(all) suberror ChunkError {
 
 pub(all) suberror DocumentError {
   EmptyDocumentId
+  InvalidDocumentText
 }
 
 pub(all) suberror ExtractionError {
@@ -24,6 +25,7 @@ pub(all) suberror ExtractionError {
 
 pub(all) suberror MatchError {
   EmptyCandidate
+  InvalidCandidate
 }
 
 pub(all) suberror SpanError {
@@ -32,18 +34,22 @@ pub(all) suberror SpanError {
 }
 
 pub(all) suberror ValidationError {
+  EmptyField
+  EmptyValue
+  InvalidValue
+  StatusMismatch(MatchStatus, MatchStatus)
+  StatusEvidenceCountMismatch(Int32, Int32)
   WrongDocumentId(Int32, String, String)
   InvalidEvidenceSpan(Int32, Int32, Int32)
+  EvidenceSpanMismatch(Int32, Int32, Int32, Int32, Int32)
   EvidenceTextMismatch(Int32, String, String)
-  StatusEvidenceCountMismatch(Int32, Int32)
   DuplicateEvidenceSpan(Int32, Int32)
   ValueEvidenceMismatch(String, String)
 }
 
 // Types and methods
-pub(all) struct Document {
-  id : String
-  text : String
+pub struct Document {
+  // private fields
 }
 pub fn Document::char_length(Self) -> Int32
 pub fn Document::chunks(Self, Int32) -> Result[Array[TextChunk], ChunkError]
@@ -51,51 +57,61 @@ pub fn Document::extract(Self, String, String, String) -> Result[Extraction, Ext
 pub fn Document::extract_normalized(Self, String, String) -> Result[Extraction, ExtractionError]
 pub fn Document::find_all(Self, String) -> Result[Array[Evidence], MatchError]
 pub fn Document::find_first(Self, String) -> Result[Evidence?, MatchError]
+pub fn Document::id(Self) -> String
 pub fn Document::locate(Self, String) -> Result[MatchResult, MatchError]
 pub fn Document::new(String, String) -> Result[Self, DocumentError]
 pub fn Document::slice(Self, Span) -> Result[String, SpanError]
+pub fn Document::text(Self) -> String
 
-pub(all) struct Evidence {
-  document_id : String
-  span : Span
-  text : String
+pub struct Evidence {
+  // private fields
 }
+pub fn Evidence::document_id(Self) -> String
+pub fn Evidence::span(Self) -> Span
+pub fn Evidence::text(Self) -> String
 pub fn Evidence::to_json(Self) -> Json
 
-pub(all) struct Extraction {
-  field : String
-  value : String
-  normalized_value : String
-  status : MatchStatus
-  evidence : Array[Evidence]
+pub struct Extraction {
+  // private fields
 }
+pub fn Extraction::evidence(Self) -> ArrayView[Evidence]
+pub fn Extraction::field(Self) -> String
+pub fn Extraction::normalized_value(Self) -> String
+pub fn Extraction::status(Self) -> MatchStatus
 pub fn Extraction::to_json(Self) -> Json
 pub fn Extraction::to_json_string(Self, indent? : Int32) -> String
+pub fn Extraction::value(Self) -> String
 
-pub(all) struct MatchResult {
-  status : MatchStatus
-  matches : Array[Evidence]
+pub struct MatchResult {
+  // private fields
 }
+pub fn MatchResult::matches(Self) -> ArrayView[Evidence]
+pub fn MatchResult::status(Self) -> MatchStatus
 
 pub(all) enum MatchStatus {
   Unique
   Ambiguous
   Missing
 }
+pub fn MatchStatus::equal(Self, Self) -> Bool
+pub fn MatchStatus::not_equal(Self, Self) -> Bool
+pub impl Eq for MatchStatus
 
-pub(all) struct Span {
-  start : Int32
-  end : Int32
+pub struct Span {
+  // private fields
 }
+pub fn Span::end(Self) -> Int32
 pub fn Span::new(Int32, Int32) -> Result[Self, SpanError]
+pub fn Span::start(Self) -> Int32
 pub fn Span::to_json(Self) -> Json
 
-pub(all) struct TextChunk {
-  index : Int32
-  start : Int32
-  end : Int32
-  text : String
+pub struct TextChunk {
+  // private fields
 }
+pub fn TextChunk::end(Self) -> Int32
+pub fn TextChunk::index(Self) -> Int32
+pub fn TextChunk::start(Self) -> Int32
+pub fn TextChunk::text(Self) -> String
 pub fn TextChunk::to_global(Self, Int32, Int32) -> Result[Span, ChunkError]
 
 // Type aliases

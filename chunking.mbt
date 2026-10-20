@@ -1,10 +1,32 @@
 ///|
 /// A code-point range of a document produced by deterministic chunking.
-pub(all) struct TextChunk {
-  index : Int32
-  start : Int32
-  end : Int32
-  text : String
+///
+/// Fields are private; chunks are created by `Document::chunks`.
+pub struct TextChunk {
+  priv index : Int32
+  priv start : Int32
+  priv end : Int32
+  priv text : String
+}
+
+///|
+pub fn TextChunk::index(self : TextChunk) -> Int32 {
+  self.index
+}
+
+///|
+pub fn TextChunk::start(self : TextChunk) -> Int32 {
+  self.start
+}
+
+///|
+pub fn TextChunk::end(self : TextChunk) -> Int32 {
+  self.end
+}
+
+///|
+pub fn TextChunk::text(self : TextChunk) -> String {
+  self.text
 }
 
 ///|
@@ -27,7 +49,7 @@ pub fn Document::chunks(
   if max_chars <= 0 {
     return Err(InvalidChunkSize(max_chars))
   }
-  let chars = self.text.to_array()
+  let chars = self.chars
   let length = chars.length()
   let chunks : Array[TextChunk] = []
   if length == 0 {

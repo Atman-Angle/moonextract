@@ -12,17 +12,28 @@
 | `Extraction` | Field, raw value, normalized value, status, and evidence. |
 | `TextChunk` | A deterministic code-point range with global offsets. |
 
+All core struct fields are private. Values must be created through the
+constructors below or through matching, extraction, and chunking APIs. This
+keeps document ids, spans, evidence, and extraction metadata consistent by
+construction. There is no public unchecked constructor.
+
 ## Construction and slicing
 
 ```moonbit
 Document::new(id, text) -> Result[Document, DocumentError]
-Span::new(start, end) -> Result[Span, SpanError]
+Document::id() -> String
+Document::text() -> String
 Document::char_length() -> Int32
 Document::slice(span) -> Result[String, SpanError]
+
+Span::new(start, end) -> Result[Span, SpanError]
+Span::start() -> Int32
+Span::end() -> Int32
 ```
 
-`Document::new` rejects blank ids but accepts empty text. `slice` rejects
-negative or inverted spans, and spans beyond `char_length()`.
+`Document::new` rejects blank ids and malformed UTF-16 text, but accepts empty
+text. `Span::new` rejects negative or inverted spans. `slice` rejects spans
+beyond `char_length()`. Offsets are always Unicode code-point indices.
 
 ## Matching
 
@@ -30,12 +41,18 @@ negative or inverted spans, and spans beyond `char_length()`.
 Document::find_first(candidate) -> Result[Evidence?, MatchError]
 Document::find_all(candidate) -> Result[Array[Evidence], MatchError]
 Document::locate(candidate) -> Result[MatchResult, MatchError]
+
+Evidence::document_id() -> String
+Evidence::span() -> Span
+Evidence::text() -> String
+MatchResult::status() -> MatchStatus
+MatchResult::matches() -> ArrayView[Evidence]
 ```
 
 Matching is exact and case-sensitive. `find_all` includes overlapping
-occurrences. `locate` classifies zero matches as `Missing`, one as `Unique`, and
-two or more as `Ambiguous`. An empty candidate returns `EmptyCandidate`; it is
-not treated as a match.
+occurrences and uses a linear-time KMP scan. `locate` classifies zero matches as
+`Missing`, one as `Unique`, and two or more as `Ambiguous`. Empty or malformed
+UTF-16 candidates return an explicit `MatchError`.
 
 ## Extraction
 
@@ -43,18 +60,29 @@ not treated as a match.
 Document::extract(field, value, normalized_value) -> Result[Extraction, ExtractionError]
 Document::extract_normalized(field, value) -> Result[Extraction, ExtractionError]
 normalize_whitespace(value) -> String
+
+Extraction::field() -> String
+Extraction::value() -> String
+Extraction::normalized_value() -> String
+Extraction::status() -> MatchStatus
+Extraction::evidence() -> ArrayView[Evidence]
 ```
 
 `extract` rejects blank fields and empty values. `value` and `evidence` remain
 verbatim. `normalized_value` is an explicit caller decision; the convenience
 constructor folds Unicode whitespace runs to one ASCII space and trims edges.
 Missing and ambiguous candidates are returned as `Extraction` values with empty
-or multiple evidence records respectively.
+or multiple evidence records respectively. Evidence is exposed as a read-only
+view.
 
 ## Chunking
 
 ```moonbit
 Document::chunks(max_chars) -> Result[Array[TextChunk], ChunkError]
+TextChunk::index() -> Int32
+TextChunk::start() -> Int32
+TextChunk::end() -> Int32
+TextChunk::text() -> String
 TextChunk::to_global(local_start, local_end) -> Result[Span, ChunkError]
 ```
 
@@ -95,19 +123,21 @@ always the verbatim document slice.
 validate_extraction(document, extraction) -> Result[Unit, ValidationError]
 ```
 
-Validation checks that:
+Validation recomputes the complete expected match set with
+`document.locate(extraction.value)` and checks that:
 
-- `Unique` has exactly one evidence record.
-- `Ambiguous` has at least two evidence records.
-- `Missing` has no evidence records.
+- Field is non-blank and value is non-empty.
+- Status equals the recomputed status.
+- Evidence count equals the complete match count.
 - Every evidence record uses the source document id.
 - Every span is non-empty and inside the document.
-- Evidence text equals the document slice at that span.
-- Evidence text equals the extraction's raw value.
+- Every span equals the expected span at the same source-order position.
+- Evidence text equals the expected verbatim text and the extraction's raw value.
 - No two evidence records repeat the same span.
 
 Validation is a textual consistency check. It does not establish semantic truth
-or model confidence.
+or model confidence. A stale `Unique` or `Missing` result cannot pass merely
+because the evidence it happens to contain is locally valid.
 
 ## Error handling
 

@@ -1,9 +1,17 @@
 ///|
-test "extraction serializes deterministic structured json" {
-  let document = @moonextract.Document::{
-    id: "contract",
-    text: "甲方：示例 公司",
+fn json_test_document(
+  id : String,
+  text : String,
+) -> @moonextract.Document raise {
+  match @moonextract.Document::new(id, text) {
+    Ok(document) => document
+    Err(_) => fail("test document should be valid")
   }
+}
+
+///|
+test "extraction serializes deterministic structured json" {
+  let document = json_test_document("contract", "甲方：示例 公司")
   match document.extract("party", "示例 公司", "示例公司") {
     Ok(extraction) => {
       let json = extraction.to_json_string()
@@ -17,10 +25,7 @@ test "extraction serializes deterministic structured json" {
 
 ///|
 test "json encodes ambiguous and missing statuses explicitly" {
-  let document = @moonextract.Document::{
-    id: "resume",
-    text: "A公司 A公司",
-  }
+  let document = json_test_document("resume", "A公司 A公司")
   match document.extract_normalized("company", "A公司") {
     Ok(extraction) => {
       let json = extraction.to_json_string()
@@ -41,10 +46,7 @@ test "json encodes ambiguous and missing statuses explicitly" {
 
 ///|
 test "json output escapes unicode evidence as valid json" {
-  let document = @moonextract.Document::{
-    id: "unicode",
-    text: "备注：😀通过",
-  }
+  let document = json_test_document("unicode", "备注：😀通过")
   match document.extract("status", "😀通过", "通过") {
     Ok(extraction) => {
       let json = extraction.to_json_string()
