@@ -1,5 +1,6 @@
-// import {
-//   "Atman-Angle/moonextract" @lib,
-// }
+import {
+  "Atman-Angle/moonextract",
+  "moonbitlang/core/env",
+}
 
 pkgtype(kind: "executable")
