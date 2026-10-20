@@ -45,3 +45,48 @@ pub fn Document::find_first(
   }
   Ok(None)
 }
+
+///|
+fn matches_at(
+  haystack : Array[Char],
+  needle : Array[Char],
+  start : Int32,
+) -> Bool {
+  for offset = 0; offset < needle.length(); offset = offset + 1 {
+    if haystack[start + offset] != needle[offset] {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// Find every exact occurrence of `candidate`, including overlapping matches.
+#warnings("-result_error_return")
+pub fn Document::find_all(
+  self : Document,
+  candidate : String,
+) -> Result[Array[Evidence], MatchError] {
+  if candidate.is_empty() {
+    return Err(EmptyCandidate)
+  }
+  let haystack = self.text.to_array()
+  let needle = candidate.to_array()
+  let hay_len = haystack.length()
+  let needle_len = needle.length()
+  let matches : Array[Evidence] = []
+  if needle_len > hay_len {
+    return Ok(matches)
+  }
+  for start = 0; start <= hay_len - needle_len; start = start + 1 {
+    if matches_at(haystack, needle, start) {
+      let end = start + needle_len
+      matches.push(Evidence::{
+        document_id: self.id,
+        span: { start, end, },
+        text: String::from_array(haystack[start:end]),
+      })
+    }
+  }
+  Ok(matches)
+}

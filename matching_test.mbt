@@ -40,3 +40,41 @@ test "find_first reports absent and empty candidates" {
     _ => fail("empty candidate should be rejected")
   }
 }
+
+///|
+test "find_all reports overlapping duplicate matches" {
+  let document = @moonextract.Document::{ id: "duplicates", text: "aaa", }
+  match document.find_all("aa") {
+    Ok(matches) => {
+      assert_eq(matches.length(), 2)
+      assert_eq(matches[0].span.start, 0)
+      assert_eq(matches[0].span.end, 2)
+      assert_eq(matches[1].span.start, 1)
+      assert_eq(matches[1].span.end, 3)
+    }
+    Err(_) => fail("duplicate search should succeed")
+  }
+}
+
+///|
+test "find_all preserves code-point offsets for repeated emoji text" {
+  let document = @moonextract.Document::{ id: "emoji", text: "😀a😀a😀", }
+  match document.find_all("😀a") {
+    Ok(matches) => {
+      assert_eq(matches.length(), 2)
+      assert_eq(matches[0].span.start, 0)
+      assert_eq(matches[1].span.start, 2)
+      assert_eq(matches[1].span.end, 4)
+    }
+    Err(_) => fail("emoji duplicate search should succeed")
+  }
+}
+
+///|
+test "find_all returns no matches without inventing evidence" {
+  let document = @moonextract.Document::{ id: "missing", text: "合同正文", }
+  match document.find_all("发票") {
+    Ok(matches) => assert_eq(matches.length(), 0)
+    Err(_) => fail("absent candidate must be a successful empty search")
+  }
+}
