@@ -29,7 +29,7 @@ moon info                # refresh public interfaces after API changes
 ```
 
 Enable the checked-in pre-commit hook with
-`git config core.hooksPath .githooks`; it runs `moon check`.
+`git config core.hooksPath .githooks`; it runs `moon fmt --check`, `moon check`, and `moon test`.
 
 ## Coding Style & Naming Conventions
 
