@@ -6,6 +6,16 @@ pub(all) suberror SpanError {
 }
 
 ///|
+/// Construct a non-negative, ordered span.
+#warnings("-result_error_return")
+pub fn Span::new(start : Int32, end : Int32) -> Result[Span, SpanError] {
+  if start < 0 || end < start {
+    return Err(InvalidSpan(start, end))
+  }
+  Ok(Span::{ start, end, })
+}
+
+///|
 /// Number of Unicode code points in the document text.
 pub fn Document::char_length(self : Document) -> Int32 {
   self.text.char_length()

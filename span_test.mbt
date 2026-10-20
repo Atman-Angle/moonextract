@@ -40,3 +40,22 @@ test "empty document has zero code points" {
     Err(_) => fail("empty span should be valid")
   }
 }
+
+///|
+test "span constructor validates ordering and sign" {
+  match @moonextract.Span::new(1, 3) {
+    Ok(span) => {
+      assert_eq(span.start, 1)
+      assert_eq(span.end, 3)
+    }
+    Err(_) => fail("valid span was rejected")
+  }
+  match @moonextract.Span::new(3, 1) {
+    Err(@moonextract.SpanError::InvalidSpan(3, 1)) => ()
+    _ => fail("inverted span was not rejected")
+  }
+  match @moonextract.Span::new(-1, 1) {
+    Err(@moonextract.SpanError::InvalidSpan(-1, 1)) => ()
+    _ => fail("negative span was not rejected")
+  }
+}
