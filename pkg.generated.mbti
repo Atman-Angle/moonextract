@@ -1,0 +1,103 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Atman-Angle/moonextract"
+
+// Values
+pub fn normalize_whitespace(String) -> String
+
+pub fn validate_extraction(Document, Extraction) -> Result[Unit, ValidationError]
+
+// Errors
+pub(all) suberror ChunkError {
+  InvalidChunkSize(Int32)
+  LocalSpanOutOfBounds(Int32, Int32, Int32)
+}
+
+pub(all) suberror DocumentError {
+  EmptyDocumentId
+}
+
+pub(all) suberror ExtractionError {
+  EmptyField
+  EmptyValue
+  InvalidCandidate
+}
+
+pub(all) suberror MatchError {
+  EmptyCandidate
+}
+
+pub(all) suberror SpanError {
+  InvalidSpan(Int32, Int32)
+  SpanOutOfBounds(Int32, Int32, Int32)
+}
+
+pub(all) suberror ValidationError {
+  WrongDocumentId(Int32, String, String)
+  InvalidEvidenceSpan(Int32, Int32, Int32)
+  EvidenceTextMismatch(Int32, String, String)
+  StatusEvidenceCountMismatch(Int32, Int32)
+  DuplicateEvidenceSpan(Int32, Int32)
+  ValueEvidenceMismatch(String, String)
+}
+
+// Types and methods
+pub(all) struct Document {
+  id : String
+  text : String
+}
+pub fn Document::char_length(Self) -> Int32
+pub fn Document::chunks(Self, Int32) -> Result[Array[TextChunk], ChunkError]
+pub fn Document::extract(Self, String, String, String) -> Result[Extraction, ExtractionError]
+pub fn Document::extract_normalized(Self, String, String) -> Result[Extraction, ExtractionError]
+pub fn Document::find_all(Self, String) -> Result[Array[Evidence], MatchError]
+pub fn Document::find_first(Self, String) -> Result[Evidence?, MatchError]
+pub fn Document::locate(Self, String) -> Result[MatchResult, MatchError]
+pub fn Document::new(String, String) -> Result[Self, DocumentError]
+pub fn Document::slice(Self, Span) -> Result[String, SpanError]
+
+pub(all) struct Evidence {
+  document_id : String
+  span : Span
+  text : String
+}
+pub fn Evidence::to_json(Self) -> Json
+
+pub(all) struct Extraction {
+  field : String
+  value : String
+  normalized_value : String
+  status : MatchStatus
+  evidence : Array[Evidence]
+}
+pub fn Extraction::to_json(Self) -> Json
+pub fn Extraction::to_json_string(Self, indent? : Int32) -> String
+
+pub(all) struct MatchResult {
+  status : MatchStatus
+  matches : Array[Evidence]
+}
+
+pub(all) enum MatchStatus {
+  Unique
+  Ambiguous
+  Missing
+}
+
+pub(all) struct Span {
+  start : Int32
+  end : Int32
+}
+pub fn Span::new(Int32, Int32) -> Result[Self, SpanError]
+pub fn Span::to_json(Self) -> Json
+
+pub(all) struct TextChunk {
+  index : Int32
+  start : Int32
+  end : Int32
+  text : String
+}
+pub fn TextChunk::to_global(Self, Int32, Int32) -> Result[Span, ChunkError]
+
+// Type aliases
+
+// Traits
