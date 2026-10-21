@@ -3,45 +3,66 @@
 [![CI](https://github.com/Atman-Angle/moonextract/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Atman-Angle/moonextract/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-MoonExtract is a pure MoonBit library for binding candidate extraction values to
-verbatim source evidence. Given a source document and a candidate value, it
-finds every exact occurrence, reports Unicode code-point spans, and classifies
-the result as `unique`, `ambiguous`, or `missing`.
+MoonExtract is a MoonBit-native extraction engine that turns text plus field
+definitions into structured values with verbatim source evidence. It works with
+an OpenAI-compatible model, but the core is provider-agnostic and deterministic
+tests use recorded model output.
 
-The core has no network, model, OCR, PDF, or filesystem dependency. It can be
-used by RAG pipelines, document review tools, IDE integrations, and any MoonBit
-application that needs to highlight or audit extracted text.
+The engine does not treat a model value as evidence. A field is accepted only
+when the model also supplies a verbatim `quote` that resolves to source text.
+Repeated quotes, missing quotes, conflicting values, and chunk boundaries are
+reported explicitly.
 
 > A matched span proves textual presence. It does not prove semantic truth.
 
-## Why evidence, not truth
+## Status
 
-An extraction pipeline can quote the wrong sentence, repeat a value from an
-earlier section, or keep a stale span after the document changes. MoonExtract
-keeps the contract narrow and testable:
+The current `v0.2` alpha includes:
 
-- Evidence is always sliced verbatim from the source document.
-- Every occurrence is returned, including overlapping matches.
-- Multiple occurrences are reported as `ambiguous`, never silently reduced to
-  one result.
-- Validation recomputes the complete match set instead of trusting a supplied
-  status or partial evidence.
-- Raw values stay separate from normalized values.
+- field definitions and model prompt construction;
+- OpenAI-compatible chat-completions adapter;
+- structured claim parsing;
+- evidence resolution with raw value, normalized value, quote, and spans;
+- context-based disambiguation for repeated source text;
+- missing-source, ambiguous-source, and non-repeatable field conflict diagnostics;
+- overlapping chunk extraction and claim deduplication;
+- two business data sets and a value-only exact-match baseline;
+- 57 MoonBit tests and a native evaluation command.
 
-This makes the result useful for review and audit without claiming that the
-candidate is semantically correct.
+See [Extraction Engine](docs/ENGINE.md), [Evaluation](docs/EVALUATION.md), and
+[Future Plan Compiler](docs/PLAN_ENGINE.md).
 
-## Features
+## Extraction flow
 
-- Unicode code-point indices with half-open `[start, end)` spans.
-- Well-formed UTF-16 validation at document construction.
-- Linear-time KMP matching for exact searches.
-- `unique`, `ambiguous`, and `missing` as explicit result states.
-- Private structural invariants and read-only collection accessors.
-- Deterministic text chunks with local-to-global coordinate mapping.
-- Stable JSON serialization for extractions and evidence.
-- End-to-end validation of status, count, document id, span, text, and order.
-- A small CLI demo for checking behavior from the command line.
+```text
+field definitions + document
+  -> overlapping chunk prompts
+  -> model claims
+  -> JSON parser
+  -> quote-to-evidence resolver
+  -> conflict and missing-source diagnostics
+  -> extraction report
+```
+
+The model response is expected to contain claims in this shape:
+
+```json
+{
+  "claims": [
+    {
+      "field": "party",
+      "value": "上海晨星科技有限公司",
+      "quote": "上海晨星科技有限公司",
+      "context": "甲方"
+    }
+  ]
+}
+```
+
+`value` is the stored value. `quote` must be copied from the document. `context`
+is optional and helps choose between repeated occurrences. A quote that is not
+in the source becomes a `missing_source` diagnostic; the engine never replaces it
+with `value`.
 
 ## Quick start
 
@@ -52,16 +73,18 @@ it can be added with:
 moon add Atman-Angle/moonextract
 ```
 
-To use the current checkout as a dependency, add the package import to
-`moon.pkg`:
+For the current checkout, use the package import in `moon.pkg`:
 
 ```moonbit
 import {
-  "Atman-Angle/moonextract" @moonextract,
+  "Atman-Angle/moonextract",
 }
 ```
 
-Build and validate an extraction:
+### Evidence core
+
+The lower-level API remains available when a caller already has a candidate
+value:
 
 ```moonbit
 let document = try! @moonextract.Document::new(
@@ -73,107 +96,106 @@ try! @moonextract.validate_extraction(document, extraction)
 println(extraction.to_json_string(indent=2))
 ```
 
-The API returns `Result` for recoverable input errors. Missing and ambiguous
-matches remain data, not exceptions.
+### Live model extraction
 
-## API at a glance
-
-| API | Purpose |
-| --- | --- |
-| `Document::new(id, text)` | Validate the document id and text, then cache code points. |
-| `Document::find_first(candidate)` | Return the first exact evidence match. |
-| `Document::find_all(candidate)` | Return every exact match, including overlaps. |
-| `Document::locate(candidate)` | Classify a candidate as `unique`, `ambiguous`, or `missing`. |
-| `Document::extract(field, value, normalized)` | Build an extraction with evidence. |
-| `Document::extract_normalized(field, value)` | Use whitespace folding for the normalized value. |
-| `Document::chunks(max_chars)` | Split text into deterministic code-point chunks. |
-| `TextChunk::to_global(local_start, local_end)` | Map a chunk-local span to document coordinates. |
-| `Extraction::to_json_string(indent?)` | Serialize an extraction deterministically. |
-| `validate_extraction(document, extraction)` | Recompute and verify all evidence. |
-
-## CLI demo
+The native CLI reads a fields JSON file and a document text file:
 
 ```powershell
-moon run cmd/main
-moon run cmd/main -- "备注：😀通过" "😀通过" status
+$env:MOONEXTRACT_API_KEY = "<provider key>"
+$env:MOONEXTRACT_MODEL = "gpt-4.1-mini"
+$env:MOONEXTRACT_BASE_URL = "https://api.openai.com/v1"
+moon run --target native cmd/extract -- examples/contract-fields.json examples/contract.txt
 ```
 
-The default demo finds two occurrences of `示例公司` and reports `ambiguous`.
-Invalid arguments print an error and exit with code 1. The second command
-reports code-point span `3..6`, not UTF-16 or UTF-8 offsets.
+`OPENAI_API_KEY` is accepted as a fallback for the key. The key is read from the
+environment and is never written to the repository.
 
-```json
-{
-  "field": "status",
-  "value": "😀通过",
-  "normalized_value": "😀通过",
-  "status": "unique",
-  "evidence": [
-    {
-      "document_id": "demo",
-      "span": { "start": 3, "end": 6 },
-      "text": "😀通过"
-    }
-  ]
-}
+### Offline end-to-end check
+
+A local OpenAI-compatible server verifies the real HTTP transport and response
+parsing without requiring an external API key:
+
+```powershell
+python scripts/mock_openai_server.py --port 18765
 ```
 
-## Contracts
+In another terminal:
 
-### Span coordinates
+```powershell
+$env:MOONEXTRACT_API_KEY = "test-key"
+$env:MOONEXTRACT_BASE_URL = "http://127.0.0.1:18765/v1"
+$env:MOONEXTRACT_MODEL = "moonextract-mock"
+moon run --target native cmd/extract -- examples/contract-fields.json examples/contract.txt
+moon run --target native cmd/extract -- examples/ticket-fields.json examples/ticket.txt
+```
 
-All public offsets are Unicode code-point indices into the original document.
-They use half-open ranges `[start, end)`. A span is valid only when
-`0 <= start <= end <= document.char_length()`. Evidence spans are non-empty.
-Do not mix these offsets with UTF-16 code units or UTF-8 byte offsets.
+This exercises the same OpenAI client, HTTP transport, prompt, parser, resolver,
+and report path as a live provider. The mock server is a protocol fixture, not a
+claim about a particular model's quality.
 
-### Validation
+## Evaluation
 
-`validate_extraction` locates the value again and compares the complete expected
-match set with the supplied extraction. It rejects:
+The checked-in data sets compare MoonExtract against a baseline that uses only
+the model's `value` with exact string matching:
 
-- an incorrect `unique`, `ambiguous`, or `missing` status;
-- a missing or extra evidence record;
-- a foreign document id;
-- an invalid, reordered, or duplicate span;
-- text that differs from the source slice or the extraction value.
+| Scenario | Engine correct | Baseline correct | Expected |
+| --- | ---: | ---: | ---: |
+| Contracts | 9 | 4 | 9 |
+| Support tickets | 11 | 8 | 11 |
 
-Validation is a textual consistency check, not a semantic or model-confidence
-check.
+The fixtures cover normalized values, repeated parties, context disambiguation,
+field conflicts, ambiguous sources, missing sources, and chunk merging.
 
-### Determinism
+```powershell
+moon run --target native cmd/eval -- datasets/contracts.json datasets/support-tickets.json
+```
 
-Matches follow source order, chunking follows code-point order, and JSON object
-keys are emitted in a stable order. The core is pure with respect to its inputs.
+See [docs/EVALUATION.md](docs/EVALUATION.md) for the test cases, reproduction
+steps, and limitations. The numbers are evidence for this curated corpus, not a
+claim of general model accuracy.
+
+## Evidence and diagnostics
+
+Public offsets are Unicode code-point indices with half-open `[start, end)`
+ranges. Evidence text is sliced from the original document. The engine rejects
+recoverable input errors with `Result` and keeps model-level failures explicit.
+
+Field results use these states:
+
+- `resolved`: exactly one quote occurrence was selected;
+- `missing_source`: the quote is absent or its context does not match;
+- `ambiguous_source`: multiple quote occurrences remain after context filtering;
+- `conflict`: a non-repeatable field has different normalized values.
+
+The report also carries stable diagnostics and the number of overlapping chunks
+used for extraction. A repeated claim from overlapping chunks is deduplicated by
+field, value, quote, and context.
 
 ## Scope
 
-The first phase is an offline, model-agnostic core. The following are explicitly
-out of scope:
+The current first phase does not implement:
 
-- LLM adapters and prompt management;
-- OCR and PDF parsing;
-- fuzzy, semantic, or vector matching;
+- OCR or PDF parsing;
+- model training or prompt management;
 - semantic truth evaluation;
-- a web UI or visualization layer.
+- a general regex engine;
+- a web UI.
 
-Those features can be built as adapters on top of MoonExtract without changing
-the evidence model.
+The exact matcher and Unicode handling are foundation layers. The extraction
+engine adds model integration, evidence resolution, context disambiguation,
+conflict handling, chunk merging, and evaluation.
 
 ## Development
 
-Run these commands from the repository root in PowerShell 7:
+Run these from the repository root in PowerShell 7:
 
 ```powershell
 moon fmt
 moon check
 moon test
-moon run cmd/main
 moon check --target all --no-mbti
+moon run --target native cmd/eval -- datasets/contracts.json datasets/support-tickets.json
 ```
-
-CI runs formatting, all-target type checking, and the full test suite on every
-push and pull request. The repository targets MoonBit 0.10.16 or newer.
 
 Enable the checked-in Git hook once per checkout:
 
@@ -185,9 +207,15 @@ The hook runs `moon fmt --check`, `moon check`, and `moon test`.
 
 ## Project documents
 
-- [Architecture](docs/ARCHITECTURE.md)
+- [Extraction Engine](docs/ENGINE.md)
+- [Evaluation](docs/EVALUATION.md)
+- [Current evidence architecture](docs/ARCHITECTURE.md)
 - [Public API](docs/API.md)
+- [Future plan compiler](docs/PLAN_ENGINE.md)
 - [Project proposal](docs/PROJECT_PROPOSAL.md)
+- [Data sets](datasets/README.md)
+- [Dependencies and licenses](docs/DEPENDENCIES.md)
+- [Adversarial technical review](docs/TECHNICAL_REVIEW.md)
 
 ## Reference and license
 

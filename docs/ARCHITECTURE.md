@@ -1,4 +1,4 @@
-# MoonExtract Architecture
+# MoonExtract Evidence Core Architecture
 
 ## Outcome and boundary
 
@@ -7,8 +7,9 @@ source `Document`. It owns Unicode-safe coordinates, exact text matching,
 duplicate discovery, ambiguity classification, normalized-value separation,
 validation, chunk coordinate mapping, and deterministic JSON serialization.
 
-It does not own prompting, model calls, document downloads, OCR, PDF extraction,
-semantic truth evaluation, or a web UI. A match proves textual presence only.
+This document covers the deterministic evidence core. The LLM extraction pipeline is documented in [ENGINE.md](ENGINE.md).
+
+The core does not own prompting, model calls, document downloads, OCR, PDF extraction, semantic truth evaluation, or a web UI. A match proves textual presence only.
 
 ## Core flow
 

@@ -1,4 +1,6 @@
-# MoonExtract API Contract
+# MoonExtract Evidence Core API
+
+The LLM extraction engine has a separate API documented in [ENGINE.md](ENGINE.md).
 
 ## Data model
 
@@ -79,6 +81,7 @@ view.
 
 ```moonbit
 Document::chunks(max_chars) -> Result[Array[TextChunk], ChunkError]
+Document::chunks_with_overlap(max_chars, overlap_chars) -> Result[Array[TextChunk], ChunkError]
 TextChunk::index() -> Int32
 TextChunk::start() -> Int32
 TextChunk::end() -> Int32
@@ -86,8 +89,7 @@ TextChunk::text() -> String
 TextChunk::to_global(local_start, local_end) -> Result[Span, ChunkError]
 ```
 
-Chunks contain at most `max_chars` code points. Each chunk keeps document-global
-`start` and `end` offsets. `to_global` rejects local spans outside the chunk.
+Chunks contain at most `max_chars` code points. Each chunk keeps document-global `start` and `end` offsets. `to_global` rejects local spans outside the chunk. `chunks_with_overlap` starts each chunk `max_chars - overlap_chars` code points after the previous one. The overlap is a boundary context guard for model extraction, not a license to accept an unbounded quote.
 
 ## JSON
 
