@@ -29,7 +29,44 @@ jobs:
         run: moon fmt --check
 
       - name: Type-check all targets
-        run: moon check --target all --no-mbti
+        run: moon check --target all --no-mbti --deny-warn
 
       - name: Run tests
         run: moon test
+
+      - name: Run native tests
+        run: moon test --target native
+
+      - name: Run deterministic data-set evaluation
+        run: |
+          moon run --target native cmd/eval -- datasets/contracts.json datasets/support-tickets.json > /tmp/moonextract-eval.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          result = json.loads(Path("/tmp/moonextract-eval.json").read_text(encoding="utf-8"))
+          for scenario in result:
+              assert scenario["summary"]["engine_accuracy"] == 1.0, scenario
+          print("evaluation: engine accuracy 1.0 on both submitted scenarios")
+          PY
+
+      - name: Verify OpenAI-compatible transport
+        env:
+          MOONEXTRACT_API_KEY: test-key
+          MOONEXTRACT_BASE_URL: http://127.0.0.1:18765/v1
+          MOONEXTRACT_MODEL: moonextract-mock
+        run: |
+          python scripts/mock_openai_server.py --port 18765 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          sleep 1
+          moon run --target native cmd/extract -- examples/contract-fields.json examples/contract.txt > /tmp/moonextract-contract.json
+          moon run --target native cmd/extract -- examples/ticket-fields.json examples/ticket.txt > /tmp/moonextract-ticket.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for name in ("contract", "ticket"):
+              result = json.loads(Path(f"/tmp/moonextract-{name}.json").read_text(encoding="utf-8"))
+              assert result["diagnostics"] == [], result
+              assert result["fields"], result
+          print("openai-compatible transport: contract and ticket extraction passed")
+          PY
