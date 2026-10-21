@@ -29,8 +29,7 @@ The current `v0.2` alpha includes:
 - two business data sets and a value-only exact-match baseline;
 - 57 MoonBit tests and a native evaluation command.
 
-See [Extraction Engine](docs/ENGINE.md), [Evaluation](docs/EVALUATION.md), and
-[Future Plan Compiler](docs/PLAN_ENGINE.md).
+See [Extraction Engine](docs/ENGINE.md) and [Evaluation](docs/EVALUATION.md).
 
 ## Extraction flow
 
@@ -211,11 +210,8 @@ The hook runs `moon fmt --check`, `moon check`, and `moon test`.
 - [Evaluation](docs/EVALUATION.md)
 - [Current evidence architecture](docs/ARCHITECTURE.md)
 - [Public API](docs/API.md)
-- [Future plan compiler](docs/PLAN_ENGINE.md)
-- [Project proposal](docs/PROJECT_PROPOSAL.md)
 - [Data sets](datasets/README.md)
 - [Dependencies and licenses](docs/DEPENDENCIES.md)
-- [Adversarial technical review](docs/TECHNICAL_REVIEW.md)
 
 ## Reference and license
 
