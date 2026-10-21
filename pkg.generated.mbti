@@ -9,6 +9,7 @@ pub fn validate_extraction(Document, Extraction) -> Result[Unit, ValidationError
 // Errors
 pub(all) suberror ChunkError {
   InvalidChunkSize(Int32)
+  InvalidOverlap(Int32, Int32)
   LocalSpanOutOfBounds(Int32, Int32, Int32)
 }
 
@@ -53,6 +54,7 @@ pub struct Document {
 }
 pub fn Document::char_length(Self) -> Int32
 pub fn Document::chunks(Self, Int32) -> Result[Array[TextChunk], ChunkError]
+pub fn Document::chunks_with_overlap(Self, Int32, Int32) -> Result[Array[TextChunk], ChunkError]
 pub fn Document::extract(Self, String, String, String) -> Result[Extraction, ExtractionError]
 pub fn Document::extract_normalized(Self, String, String) -> Result[Extraction, ExtractionError]
 pub fn Document::find_all(Self, String) -> Result[Array[Evidence], MatchError]

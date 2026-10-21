@@ -11,7 +11,7 @@
 
 name = "Atman-Angle/moonextract"
 
-version = "0.1.0"
+version = "0.2.0"
 
 readme = "README.md"
 
@@ -19,8 +19,23 @@ repository = "https://github.com/Atman-Angle/moonextract"
 
 license = "Apache-2.0"
 
-keywords = [ "extraction", "evidence", "grounding", "nlp", "unicode" ]
+keywords = [
+  "extraction",
+  "evidence",
+  "grounding",
+  "llm",
+  "openai",
+  "structured-extraction",
+  "unicode",
+]
 
 preferred_target = "wasm"
 
-description = "Traceable structured extraction primitives for MoonBit"
+description = "Evidence-grounded LLM structured extraction for MoonBit"
+
+import {
+  "gaato/openai@0.6.0",
+  "gaato/http-async@0.4.2",
+  "gaato/http@0.4.1",
+  "moonbitlang/async@0.22.5",
+}

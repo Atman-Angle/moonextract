@@ -1,7 +1,8 @@
 ///|
 /// A code-point range of a document produced by deterministic chunking.
 ///
-/// Fields are private; chunks are created by `Document::chunks`.
+/// Fields are private; chunks are created by `Document::chunks` or
+/// `Document::chunks_with_overlap`.
 pub struct TextChunk {
   priv index : Int32
   priv start : Int32
@@ -33,6 +34,7 @@ pub fn TextChunk::text(self : TextChunk) -> String {
 /// Recoverable errors raised while chunking or mapping local spans.
 pub(all) suberror ChunkError {
   InvalidChunkSize(Int32)
+  InvalidOverlap(Int32, Int32)
   LocalSpanOutOfBounds(Int32, Int32, Int32)
 }
 
@@ -46,8 +48,27 @@ pub fn Document::chunks(
   self : Document,
   max_chars : Int32,
 ) -> Result[Array[TextChunk], ChunkError] {
+  self.chunks_with_overlap(max_chars, 0)
+}
+
+///|
+/// Split a document into overlapping code-point chunks.
+///
+/// Each chunk contains at most `max_chars` code points and starts
+/// `max_chars - overlap_chars` code points after the preceding chunk. The
+/// overlap is a finite boundary guard; callers must still reject a quote that
+/// does not fit inside a chunk.
+#warnings("-result_error_return")
+pub fn Document::chunks_with_overlap(
+  self : Document,
+  max_chars : Int32,
+  overlap_chars : Int32,
+) -> Result[Array[TextChunk], ChunkError] {
   if max_chars <= 0 {
     return Err(InvalidChunkSize(max_chars))
+  }
+  if overlap_chars < 0 || overlap_chars >= max_chars {
+    return Err(InvalidOverlap(max_chars, overlap_chars))
   }
   let chars = self.chars
   let length = chars.length()
@@ -55,6 +76,7 @@ pub fn Document::chunks(
   if length == 0 {
     return Ok(chunks)
   }
+  let step = max_chars - overlap_chars
   let mut start = 0
   let mut index = 0
   while start < length {
@@ -68,7 +90,10 @@ pub fn Document::chunks(
       end,
       text: String::from_array(chars[start:end]),
     })
-    start = end
+    if end == length {
+      break
+    }
+    start = start + step
     index = index + 1
   }
   Ok(chunks)

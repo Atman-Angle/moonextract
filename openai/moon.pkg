@@ -1,0 +1,7 @@
+import {
+  "Atman-Angle/moonextract/engine",
+  "gaato/http-async" @http_async,
+  "gaato/openai" @provider,
+}
+
+supported_targets = "js + native + wasm"

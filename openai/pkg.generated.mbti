@@ -1,0 +1,23 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Atman-Angle/moonextract/openai"
+
+import {
+  "Atman-Angle/moonextract/engine",
+}
+
+// Values
+pub async fn complete(OpenAIConfig, @engine.Prompt) -> Result[String, String]
+
+// Errors
+
+// Types and methods
+pub struct OpenAIConfig {
+  // private fields
+}
+pub fn OpenAIConfig::base_url(Self) -> String
+pub fn OpenAIConfig::model(Self) -> String
+pub fn OpenAIConfig::new(api_key~ : String, model~ : String, base_url? : String) -> Self
+
+// Type aliases
+
+// Traits

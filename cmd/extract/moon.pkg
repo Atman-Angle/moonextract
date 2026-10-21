@@ -1,0 +1,12 @@
+import {
+  "Atman-Angle/moonextract",
+  "Atman-Angle/moonextract/engine",
+  "Atman-Angle/moonextract/openai" @llm,
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/core/env",
+}
+
+supported_targets = "+native"
+
+pkgtype(kind: "executable")
