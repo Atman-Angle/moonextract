@@ -10,6 +10,8 @@ pub fn build_prompt(Array[FieldDefinition], String) -> Prompt
 
 pub async fn extract_with_model(@moonextract.Document, Array[FieldDefinition], async (Prompt) -> Result[String, String], chunk_size? : Int32, overlap? : Int32) -> Result[ExtractionReport, EngineError]
 
+pub fn normalize_number(String) -> String?
+
 pub fn parse_field_definitions(String) -> Result[Array[FieldDefinition], EngineError]
 
 pub fn parse_model_output(String) -> Result[Array[LlmClaim], EngineError]
@@ -17,6 +19,8 @@ pub fn parse_model_output(String) -> Result[Array[LlmClaim], EngineError]
 pub fn prompt_for_chunk(Array[FieldDefinition], String) -> Prompt
 
 pub fn resolve_claims(@moonextract.Document, Array[FieldDefinition], Array[LlmClaim], Int32) -> Result[ExtractionReport, EngineError]
+
+pub fn verify_value(FieldDefinition, LlmClaim, @moonextract.Evidence) -> ValueConsistency
 
 // Errors
 pub(all) suberror EngineError {
@@ -29,6 +33,15 @@ pub(all) suberror EngineError {
 }
 
 // Types and methods
+pub struct ClaimSource {
+  // private fields
+}
+pub fn ClaimSource::end(Self) -> Int32
+pub fn ClaimSource::index(Self) -> Int32
+pub fn ClaimSource::new(index~ : Int32, start~ : Int32, end~ : Int32) -> Self
+pub fn ClaimSource::start(Self) -> Int32
+pub fn ClaimSource::to_json(Self) -> Json
+
 pub(all) enum Diagnostic {
   UnknownField(String)
   MissingSource(String, String)
@@ -36,8 +49,13 @@ pub(all) enum Diagnostic {
   ContextMismatch(String, String, String)
   MissingRequiredField(String)
   FieldConflict(String, Array[String])
+  ValueUnverified(String, String, String)
+  ValueMismatch(String, String, String)
+  SourceOutsideChunk(String, String, Int32)
   DuplicateClaim(String, String)
 }
+pub fn Diagnostic::code(Self) -> String
+pub fn Diagnostic::field(Self) -> String?
 
 pub struct ExtractionReport {
   // private fields
@@ -55,10 +73,11 @@ pub struct FieldDefinition {
 pub fn FieldDefinition::description(Self) -> String
 pub fn FieldDefinition::from_json(Json) -> Result[Self, EngineError]
 pub fn FieldDefinition::name(Self) -> String
-pub fn FieldDefinition::new(name~ : String, description~ : String, required? : Bool, repeatable? : Bool) -> Self
+pub fn FieldDefinition::new(name~ : String, description~ : String, required? : Bool, repeatable? : Bool, value_kind? : FieldValueKind) -> Self
 pub fn FieldDefinition::repeatable(Self) -> Bool
 pub fn FieldDefinition::required(Self) -> Bool
 pub fn FieldDefinition::to_json(Self) -> Json
+pub fn FieldDefinition::value_kind(Self) -> FieldValueKind
 
 pub struct FieldResult {
   // private fields
@@ -68,10 +87,13 @@ pub fn FieldResult::evidence(Self) -> ArrayView[@moonextract.Evidence]
 pub fn FieldResult::field(Self) -> String
 pub fn FieldResult::normalized_value(Self) -> String
 pub fn FieldResult::quote(Self) -> String
+pub fn FieldResult::source_chunk(Self) -> ClaimSource?
 pub fn FieldResult::status(Self) -> FieldStatus
 pub fn FieldResult::status_name(Self) -> String
 pub fn FieldResult::to_json(Self) -> Json
 pub fn FieldResult::value(Self) -> String
+pub fn FieldResult::value_consistency(Self) -> ValueConsistency
+pub fn FieldResult::value_consistency_name(Self) -> String
 
 pub(all) enum FieldStatus {
   Resolved
@@ -81,14 +103,22 @@ pub(all) enum FieldStatus {
 }
 pub fn FieldStatus::name(Self) -> String
 
+pub(all) enum FieldValueKind {
+  Text
+  Number
+}
+pub fn FieldValueKind::name(Self) -> String
+
 pub struct LlmClaim {
   // private fields
 }
 pub fn LlmClaim::context(Self) -> String?
 pub fn LlmClaim::field(Self) -> String
-pub fn LlmClaim::new(field~ : String, value~ : String, quote~ : String, context? : String) -> Self
+pub fn LlmClaim::new(field~ : String, value~ : String, quote~ : String, context? : String, source? : ClaimSource) -> Self
 pub fn LlmClaim::quote(Self) -> String
+pub fn LlmClaim::source(Self) -> ClaimSource?
 pub fn LlmClaim::value(Self) -> String
+pub fn LlmClaim::with_source(Self, ClaimSource) -> Self
 
 pub struct Prompt {
   // private fields
@@ -96,6 +126,13 @@ pub struct Prompt {
 pub fn Prompt::new(system~ : String, user~ : String) -> Self
 pub fn Prompt::system(Self) -> String
 pub fn Prompt::user(Self) -> String
+
+pub(all) enum ValueConsistency {
+  Verified
+  Unverified
+  Mismatch
+}
+pub fn ValueConsistency::name(Self) -> String
 
 // Type aliases
 

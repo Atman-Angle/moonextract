@@ -58,7 +58,22 @@ pub fn FieldDefinition::from_json(
       }
       let required = json_bool_field(object, "required").unwrap_or(true)
       let repeatable = json_bool_field(object, "repeatable").unwrap_or(false)
-      Ok(FieldDefinition::new(name~, description~, required~, repeatable~))
+      let value_kind = match json_string_field(object, "value_kind") {
+        None => Text
+        Some("text") => Text
+        Some("number") => Number
+        Some(other) =>
+          return Err(InvalidFieldDefinition("unsupported value_kind: " + other))
+      }
+      Ok(
+        FieldDefinition::new(
+          name~,
+          description~,
+          required~,
+          repeatable~,
+          value_kind~,
+        ),
+      )
     }
     _ => Err(InvalidFieldDefinition("field definition must be an object"))
   }

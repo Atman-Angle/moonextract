@@ -1,10 +1,26 @@
 ///|
+/// The value comparison policy attached to a field definition.
+pub(all) enum FieldValueKind {
+  Text
+  Number
+}
+
+///|
+pub fn FieldValueKind::name(self : FieldValueKind) -> String {
+  match self {
+    Text => "text"
+    Number => "number"
+  }
+}
+
+///|
 /// A field requested from the model.
 pub struct FieldDefinition {
   priv name : String
   priv description : String
   priv required : Bool
   priv repeatable : Bool
+  priv value_kind : FieldValueKind
 }
 
 ///|
@@ -13,8 +29,9 @@ pub fn FieldDefinition::new(
   description~ : String,
   required~ : Bool = true,
   repeatable~ : Bool = false,
+  value_kind~ : FieldValueKind = Text,
 ) -> FieldDefinition {
-  { name, description, required, repeatable, }
+  { name, description, required, repeatable, value_kind, }
 }
 
 ///|
@@ -38,12 +55,59 @@ pub fn FieldDefinition::repeatable(self : FieldDefinition) -> Bool {
 }
 
 ///|
+pub fn FieldDefinition::value_kind(self : FieldDefinition) -> FieldValueKind {
+  self.value_kind
+}
+
+///|
 pub fn FieldDefinition::to_json(self : FieldDefinition) -> Json {
   Json::object({
     "name": Json::string(self.name),
     "description": Json::string(self.description),
     "required": Json::boolean(self.required),
     "repeatable": Json::boolean(self.repeatable),
+    "value_kind": Json::string(self.value_kind.name()),
+  })
+}
+
+///|
+/// The document chunk that produced a claim.
+pub struct ClaimSource {
+  priv index : Int32
+  priv start : Int32
+  priv end : Int32
+}
+
+///|
+pub fn ClaimSource::new(
+  index~ : Int32,
+  start~ : Int32,
+  end~ : Int32,
+) -> ClaimSource {
+  { index, start, end, }
+}
+
+///|
+pub fn ClaimSource::index(self : ClaimSource) -> Int32 {
+  self.index
+}
+
+///|
+pub fn ClaimSource::start(self : ClaimSource) -> Int32 {
+  self.start
+}
+
+///|
+pub fn ClaimSource::end(self : ClaimSource) -> Int32 {
+  self.end
+}
+
+///|
+pub fn ClaimSource::to_json(self : ClaimSource) -> Json {
+  Json::object({
+    "index": Json::number(self.index.to_double()),
+    "start": Json::number(self.start.to_double()),
+    "end": Json::number(self.end.to_double()),
   })
 }
 
@@ -52,12 +116,14 @@ pub fn FieldDefinition::to_json(self : FieldDefinition) -> Json {
 ///
 /// `quote` is expected to be verbatim source text. `value` is the value the
 /// caller wants to keep and may differ by whitespace or formatting. `context`
-/// is an optional nearby phrase used to disambiguate repeated quotes.
+/// is an optional nearby phrase used to disambiguate repeated quotes. `source`
+/// records the chunk that produced the claim when the engine supplied one.
 pub struct LlmClaim {
   priv field : String
   priv value : String
   priv quote : String
   priv context : String?
+  priv source : ClaimSource?
 }
 
 ///|
@@ -66,8 +132,14 @@ pub fn LlmClaim::new(
   value~ : String,
   quote~ : String,
   context? : String,
+  source? : ClaimSource,
 ) -> LlmClaim {
-  { field, value, quote, context, }
+  { field, value, quote, context, source, }
+}
+
+///|
+pub fn LlmClaim::with_source(self : LlmClaim, source : ClaimSource) -> LlmClaim {
+  { ..self, source: Some(source), }
 }
 
 ///|
@@ -91,6 +163,11 @@ pub fn LlmClaim::context(self : LlmClaim) -> String? {
 }
 
 ///|
+pub fn LlmClaim::source(self : LlmClaim) -> ClaimSource? {
+  self.source
+}
+
+///|
 /// The prompt handed to a model provider.
 pub struct Prompt {
   priv system : String
@@ -110,6 +187,23 @@ pub fn Prompt::system(self : Prompt) -> String {
 ///|
 pub fn Prompt::user(self : Prompt) -> String {
   self.user
+}
+
+///|
+/// Whether a field value can be proven consistent with its source quote.
+pub(all) enum ValueConsistency {
+  Verified
+  Unverified
+  Mismatch
+}
+
+///|
+pub fn ValueConsistency::name(self : ValueConsistency) -> String {
+  match self {
+    Verified => "verified"
+    Unverified => "unverified"
+    Mismatch => "mismatch"
+  }
 }
 
 ///|
@@ -140,7 +234,42 @@ pub(all) enum Diagnostic {
   ContextMismatch(String, String, String)
   MissingRequiredField(String)
   FieldConflict(String, Array[String])
+  ValueUnverified(String, String, String)
+  ValueMismatch(String, String, String)
+  SourceOutsideChunk(String, String, Int32)
   DuplicateClaim(String, String)
+}
+
+///|
+pub fn Diagnostic::code(self : Diagnostic) -> String {
+  match self {
+    UnknownField(_) => "unknown_field"
+    MissingSource(_, _) => "missing_source"
+    AmbiguousSource(_, _, _) => "ambiguous_source"
+    ContextMismatch(_, _, _) => "context_mismatch"
+    MissingRequiredField(_) => "missing_required_field"
+    FieldConflict(_, _) => "field_conflict"
+    ValueUnverified(_, _, _) => "value_unverified"
+    ValueMismatch(_, _, _) => "value_mismatch"
+    SourceOutsideChunk(_, _, _) => "source_outside_chunk"
+    DuplicateClaim(_, _) => "duplicate_claim"
+  }
+}
+
+///|
+pub fn Diagnostic::field(self : Diagnostic) -> String? {
+  match self {
+    UnknownField(field) => Some(field)
+    MissingSource(field, _) => Some(field)
+    AmbiguousSource(field, _, _) => Some(field)
+    ContextMismatch(field, _, _) => Some(field)
+    MissingRequiredField(field) => Some(field)
+    FieldConflict(field, _) => Some(field)
+    ValueUnverified(field, _, _) => Some(field)
+    ValueMismatch(field, _, _) => Some(field)
+    SourceOutsideChunk(field, _, _) => Some(field)
+    DuplicateClaim(field, _) => Some(field)
+  }
 }
 
 ///|
@@ -148,7 +277,7 @@ fn diagnostic_to_json(diagnostic : Diagnostic) -> Json {
   match diagnostic {
     UnknownField(field) =>
       Json::object({
-        "code": Json::string("unknown_field"),
+        "code": Json::string(diagnostic.code()),
         "field": Json::string(field),
         "message": Json::string(
           "model returned a field that is not in the plan",
@@ -156,16 +285,16 @@ fn diagnostic_to_json(diagnostic : Diagnostic) -> Json {
       })
     MissingSource(field, quote) =>
       Json::object({
-        "code": Json::string("missing_source"),
+        "code": Json::string(diagnostic.code()),
         "field": Json::string(field),
         "quote": Json::string(quote),
         "message": Json::string(
-          "the proposed quote was not found in the document",
+          "the proposed quote was not found in the source chunk",
         ),
       })
     AmbiguousSource(field, quote, count) =>
       Json::object({
-        "code": Json::string("ambiguous_source"),
+        "code": Json::string(diagnostic.code()),
         "field": Json::string(field),
         "quote": Json::string(quote),
         "count": Json::number(count.to_double()),
@@ -173,7 +302,7 @@ fn diagnostic_to_json(diagnostic : Diagnostic) -> Json {
       })
     ContextMismatch(field, quote, context) =>
       Json::object({
-        "code": Json::string("context_mismatch"),
+        "code": Json::string(diagnostic.code()),
         "field": Json::string(field),
         "quote": Json::string(quote),
         "context": Json::string(context),
@@ -183,7 +312,7 @@ fn diagnostic_to_json(diagnostic : Diagnostic) -> Json {
       })
     MissingRequiredField(field) =>
       Json::object({
-        "code": Json::string("missing_required_field"),
+        "code": Json::string(diagnostic.code()),
         "field": Json::string(field),
         "message": Json::string(
           "the model returned no claim for a required field",
@@ -195,7 +324,7 @@ fn diagnostic_to_json(diagnostic : Diagnostic) -> Json {
         json_values.push(Json::string(value))
       }
       Json::object({
-        "code": Json::string("field_conflict"),
+        "code": Json::string(diagnostic.code()),
         "field": Json::string(field),
         "values": Json::array(json_values),
         "message": Json::string(
@@ -203,9 +332,39 @@ fn diagnostic_to_json(diagnostic : Diagnostic) -> Json {
         ),
       })
     }
+    ValueUnverified(field, value, quote) =>
+      Json::object({
+        "code": Json::string(diagnostic.code()),
+        "field": Json::string(field),
+        "value": Json::string(value),
+        "quote": Json::string(quote),
+        "message": Json::string(
+          "the quote exists but the value relation cannot be proven",
+        ),
+      })
+    ValueMismatch(field, value, quote) =>
+      Json::object({
+        "code": Json::string(diagnostic.code()),
+        "field": Json::string(field),
+        "value": Json::string(value),
+        "quote": Json::string(quote),
+        "message": Json::string(
+          "the normalized value does not match the source quote",
+        ),
+      })
+    SourceOutsideChunk(field, quote, chunk_index) =>
+      Json::object({
+        "code": Json::string(diagnostic.code()),
+        "field": Json::string(field),
+        "quote": Json::string(quote),
+        "chunk_index": Json::number(chunk_index.to_double()),
+        "message": Json::string(
+          "the proposed quote does not occur in the claim's source chunk",
+        ),
+      })
     DuplicateClaim(field, value) =>
       Json::object({
-        "code": Json::string("duplicate_claim"),
+        "code": Json::string(diagnostic.code()),
         "field": Json::string(field),
         "value": Json::string(value),
         "message": Json::string("duplicate claim was ignored"),
@@ -222,6 +381,8 @@ pub struct FieldResult {
   priv quote : String
   priv context : String?
   priv status : FieldStatus
+  priv value_consistency : ValueConsistency
+  priv source_chunk : ClaimSource?
   priv evidence : Array[@moonextract.Evidence]
 }
 
@@ -261,6 +422,21 @@ pub fn FieldResult::status_name(self : FieldResult) -> String {
 }
 
 ///|
+pub fn FieldResult::value_consistency(self : FieldResult) -> ValueConsistency {
+  self.value_consistency
+}
+
+///|
+pub fn FieldResult::value_consistency_name(self : FieldResult) -> String {
+  self.value_consistency.name()
+}
+
+///|
+pub fn FieldResult::source_chunk(self : FieldResult) -> ClaimSource? {
+  self.source_chunk
+}
+
+///|
 pub fn FieldResult::evidence(
   self : FieldResult,
 ) -> ArrayView[@moonextract.Evidence] {
@@ -283,6 +459,11 @@ pub fn FieldResult::to_json(self : FieldResult) -> Json {
       None => Json::null()
     },
     "status": Json::string(self.status.name()),
+    "value_consistency": Json::string(self.value_consistency.name()),
+    "source_chunk": match self.source_chunk {
+      Some(source) => source.to_json()
+      None => Json::null()
+    },
     "evidence": Json::array(evidence_json),
   })
 }

@@ -26,7 +26,6 @@ fn span_distance(left : @moonextract.Span, right : @moonextract.Span) -> Int32 {
 }
 
 ///|
-/// Return the distance to the nearest occurrence of `context`, if any.
 fn context_distance(
   document : @moonextract.Document,
   evidence : @moonextract.Evidence,
@@ -57,18 +56,53 @@ fn context_distance(
 }
 
 ///|
+fn normalized_claim_value(claim : LlmClaim, field : FieldDefinition) -> String {
+  match field.value_kind() {
+    Number =>
+      match normalize_number(claim.value()) {
+        Some(value) => value
+        None => @moonextract.normalize_whitespace(claim.value())
+      }
+    Text => @moonextract.normalize_whitespace(claim.value())
+  }
+}
+
+///|
 fn make_field_result(
+  field : FieldDefinition,
   claim : LlmClaim,
   status : FieldStatus,
   evidence : Array[@moonextract.Evidence],
+  diagnostics : Array[Diagnostic],
 ) -> FieldResult {
+  let mut consistency = Unverified
+  let resolved = match status {
+    Resolved => true
+    _ => false
+  }
+  if resolved && evidence.length() == 1 {
+    consistency = verify_value(field, claim, evidence[0])
+    match consistency {
+      Verified => ()
+      Unverified =>
+        diagnostics.push(
+          ValueUnverified(claim.field(), claim.value(), claim.quote()),
+        )
+      Mismatch =>
+        diagnostics.push(
+          ValueMismatch(claim.field(), claim.value(), claim.quote()),
+        )
+    }
+  }
   FieldResult::{
     field: claim.field(),
     value: claim.value(),
-    normalized_value: @moonextract.normalize_whitespace(claim.value()),
+    normalized_value: normalized_claim_value(claim, field),
     quote: claim.quote(),
     context: claim.context(),
     status,
+    value_consistency: consistency,
+    source_chunk: claim.source(),
     evidence,
   }
 }
@@ -76,23 +110,45 @@ fn make_field_result(
 ///|
 fn resolve_one_claim(
   document : @moonextract.Document,
+  field : FieldDefinition,
   claim : LlmClaim,
   diagnostics : Array[Diagnostic],
 ) -> FieldResult {
   if claim.quote().is_empty() {
     diagnostics.push(MissingSource(claim.field(), claim.quote()))
-    return make_field_result(claim, MissingSource, [])
+    return make_field_result(field, claim, MissingSource, [], diagnostics)
   }
-  let matches = match document.find_all(claim.quote()) {
+  let all_matches = match document.find_all(claim.quote()) {
     Ok(matches) => matches
     Err(_) => {
       diagnostics.push(MissingSource(claim.field(), claim.quote()))
-      return make_field_result(claim, MissingSource, [])
+      return make_field_result(field, claim, MissingSource, [], diagnostics)
     }
   }
-  if matches.length() == 0 {
+  if all_matches.length() == 0 {
     diagnostics.push(MissingSource(claim.field(), claim.quote()))
-    return make_field_result(claim, MissingSource, [])
+    return make_field_result(field, claim, MissingSource, [], diagnostics)
+  }
+  let matches : Array[@moonextract.Evidence] = []
+  match claim.source() {
+    Some(source) => {
+      for evidence in all_matches {
+        if evidence.span().start() >= source.start() &&
+          evidence.span().end() <= source.end() {
+          matches.push(evidence)
+        }
+      }
+      if matches.length() == 0 {
+        diagnostics.push(
+          SourceOutsideChunk(claim.field(), claim.quote(), source.index()),
+        )
+        return make_field_result(field, claim, MissingSource, [], diagnostics)
+      }
+    }
+    None =>
+      for evidence in all_matches {
+        matches.push(evidence)
+      }
   }
   let selected : Array[@moonextract.Evidence] = []
   match claim.context() {
@@ -112,7 +168,7 @@ fn resolve_one_claim(
       }
       if scored.length() == 0 {
         diagnostics.push(ContextMismatch(claim.field(), claim.quote(), context))
-        return make_field_result(claim, MissingSource, [])
+        return make_field_result(field, claim, MissingSource, [], diagnostics)
       }
       for item in scored {
         if item.1 == nearest {
@@ -123,18 +179,30 @@ fn resolve_one_claim(
         diagnostics.push(
           AmbiguousSource(claim.field(), claim.quote(), selected.length()),
         )
-        return make_field_result(claim, AmbiguousSource, selected)
+        return make_field_result(
+          field,
+          claim,
+          AmbiguousSource,
+          selected,
+          diagnostics,
+        )
       }
-      make_field_result(claim, Resolved, selected)
+      make_field_result(field, claim, Resolved, selected, diagnostics)
     }
     _ => {
       if matches.length() > 1 {
         diagnostics.push(
           AmbiguousSource(claim.field(), claim.quote(), matches.length()),
         )
-        return make_field_result(claim, AmbiguousSource, matches)
+        return make_field_result(
+          field,
+          claim,
+          AmbiguousSource,
+          matches,
+          diagnostics,
+        )
       }
-      make_field_result(claim, Resolved, matches)
+      make_field_result(field, claim, Resolved, matches, diagnostics)
     }
   }
 }
@@ -163,6 +231,90 @@ fn normalized_values_for(
 }
 
 ///|
+fn result_key(result : FieldResult) -> String {
+  let mut key = result.field() +
+    "\u{0}" +
+    result.value() +
+    "\u{0}" +
+    result.quote() +
+    "\u{0}" +
+    result.status_name()
+  for evidence in result.evidence() {
+    key = key +
+      "\u{0}" +
+      evidence.span().start().to_string() +
+      ":" +
+      evidence.span().end().to_string()
+  }
+  key
+}
+
+///|
+fn append_unique_result(
+  results : Array[FieldResult],
+  seen : Map[String, Unit],
+  result : FieldResult,
+) -> Unit {
+  let key = result_key(result)
+  if !seen.contains(key) {
+    seen.set(key, ())
+    results.push(result)
+  }
+}
+
+///|
+fn diagnostic_key(diagnostic : Diagnostic) -> String {
+  match diagnostic {
+    UnknownField(value) => diagnostic.code() + "\u{0}" + value
+    MissingSource(field, quote) =>
+      diagnostic.code() + "\u{0}" + field + "\u{0}" + quote
+    AmbiguousSource(field, quote, count) =>
+      diagnostic.code() +
+      "\u{0}" +
+      field +
+      "\u{0}" +
+      quote +
+      "\u{0}" +
+      count.to_string()
+    ContextMismatch(field, quote, context) =>
+      diagnostic.code() + "\u{0}" + field + "\u{0}" + quote + "\u{0}" + context
+    MissingRequiredField(field) => diagnostic.code() + "\u{0}" + field
+    FieldConflict(field, values) =>
+      diagnostic.code() + "\u{0}" + field + "\u{0}" + values.join(",")
+    ValueUnverified(field, value, quote) =>
+      diagnostic.code() + "\u{0}" + field + "\u{0}" + value + "\u{0}" + quote
+    ValueMismatch(field, value, quote) =>
+      diagnostic.code() + "\u{0}" + field + "\u{0}" + value + "\u{0}" + quote
+    SourceOutsideChunk(field, quote, chunk_index) =>
+      diagnostic.code() +
+      "\u{0}" +
+      field +
+      "\u{0}" +
+      quote +
+      "\u{0}" +
+      chunk_index.to_string()
+    DuplicateClaim(field, value) =>
+      diagnostic.code() + "\u{0}" + field + "\u{0}" + value
+  }
+}
+
+///|
+fn unique_diagnostics(diagnostics : Array[Diagnostic]) -> Array[Diagnostic] {
+  let unique : Array[Diagnostic] = []
+  let seen : Map[String, Unit] = Map([])
+  for diagnostic in diagnostics {
+    let key = diagnostic_key(diagnostic)
+    if !seen.contains(key) {
+      seen.set(key, ())
+      unique.push(diagnostic)
+    }
+  }
+  unique
+}
+
+///|
+
+///|
 fn has_result_for(results : Array[FieldResult], field_name : String) -> Bool {
   for result in results {
     if result.field() == field_name {
@@ -175,10 +327,11 @@ fn has_result_for(results : Array[FieldResult], field_name : String) -> Bool {
 ///|
 /// Resolve model claims against the complete source document.
 ///
-/// Claims are first deduplicated because overlapping chunks can produce the same
-/// claim more than once. Each remaining quote is resolved against the full
-/// document, not the individual chunk, so a quote can be checked against every
-/// source occurrence and the supplied context.
+/// A claim produced by a chunk carries the chunk's global boundaries. The quote
+/// must occur inside that chunk, which prevents an overlapping chunk or a
+/// repeated source string from being rebound to a different location. Results
+/// that resolve to the same field, value, quote, status, and evidence span are
+/// deduplicated after resolution.
 #warnings("-result_error_return")
 pub fn resolve_claims(
   document : @moonextract.Document,
@@ -196,34 +349,19 @@ pub fn resolve_claims(
     }
     field_names.set(field.name(), ())
   }
-  let seen_claims : Map[String, Unit] = Map([])
   let results : Array[FieldResult] = []
   let diagnostics : Array[Diagnostic] = []
+  let seen_results : Map[String, Unit] = Map([])
   for claim in claims {
-    let known_field = match field_definition(fields, claim.field()) {
+    let field = match field_definition(fields, claim.field()) {
       Some(field) => field
       None => {
         diagnostics.push(UnknownField(claim.field()))
         continue
       }
     }
-    let context_key = match claim.context() {
-      Some(context) => context
-      None => ""
-    }
-    let key = claim.field() +
-      "\u{0}" +
-      claim.value() +
-      "\u{0}" +
-      claim.quote() +
-      "\u{0}" +
-      context_key
-    if seen_claims.contains(key) {
-      continue
-    }
-    seen_claims.set(key, ())
-    results.push(resolve_one_claim(document, claim, diagnostics))
-    let _ = known_field
+    let result = resolve_one_claim(document, field, claim, diagnostics)
+    append_unique_result(results, seen_results, result)
   }
   for field in fields {
     let values = normalized_values_for(results, field.name())
@@ -242,7 +380,7 @@ pub fn resolve_claims(
   Ok(ExtractionReport::{
     document_id: document.id(),
     fields: results,
-    diagnostics,
+    diagnostics: unique_diagnostics(diagnostics),
     chunk_count,
   })
 }

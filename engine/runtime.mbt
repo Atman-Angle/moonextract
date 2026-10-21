@@ -36,8 +36,13 @@ pub async fn extract_with_model(
       Ok(parsed) => parsed
       Err(error) => return Err(error)
     }
+    let source = ClaimSource::new(
+      index=chunk.index(),
+      start=chunk.start(),
+      end=chunk.end(),
+    )
     for claim in parsed {
-      claims.push(claim)
+      claims.push(claim.with_source(source))
     }
   }
   resolve_claims(document, fields, claims, chunks.length())

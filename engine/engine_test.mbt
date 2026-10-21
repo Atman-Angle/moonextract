@@ -234,3 +234,187 @@ test "normalized value and verbatim quote remain separate" {
   assert_eq(report.fields()[0].quote(), "120,000 元")
   assert_eq(report.fields()[0].evidence()[0].text(), "120,000 元")
 }
+
+///|
+test "numeric values normalize separators and units" {
+  assert_eq(@engine.normalize_number("120,000 元"), Some("120000"))
+  assert_eq(@engine.normalize_number("120000元"), Some("120000"))
+  assert_eq(@engine.normalize_number("30 日"), Some("30"))
+  assert_eq(@engine.normalize_number("abc"), None)
+}
+
+///|
+test "numeric mismatch is explicit even when quote exists" {
+  let document = engine_test_document(
+    "contract", "合同总金额：120,000 元",
+  )
+  let fields = [
+    @engine.FieldDefinition::new(
+      name="amount",
+      description="合同金额",
+      value_kind=@engine.FieldValueKind::Number,
+    ),
+  ]
+  let claims = [
+    @engine.LlmClaim::new(
+      field="amount",
+      value="999999 元",
+      quote="120,000 元",
+    ),
+  ]
+  let report = engine_test_report(document, fields, claims)
+  match report.fields()[0].status() {
+    @engine.FieldStatus::Resolved => ()
+    _ => fail("the quote itself is resolved")
+  }
+  match report.fields()[0].value_consistency() {
+    @engine.ValueConsistency::Mismatch => ()
+    _ => fail("numeric consistency should be mismatch")
+  }
+  match report.diagnostics()[0] {
+    @engine.Diagnostic::ValueMismatch("amount", "999999 元", "120,000 元") =>
+      ()
+    _ => fail("numeric mismatch should be diagnosed")
+  }
+}
+
+///|
+test "source chunk prevents binding to a global duplicate" {
+  let document = engine_test_document("duplicate", "晨星\n---\n晨星")
+  let source = @engine.ClaimSource::new(index=0, start=0, end=5)
+  let fields = [
+    @engine.FieldDefinition::new(name="party", description="签约方"),
+  ]
+  let claims = [
+    @engine.LlmClaim::new(
+      field="party",
+      value="晨星",
+      quote="晨星",
+      source~,
+    ),
+  ]
+  let report = engine_test_report(document, fields, claims)
+  match report.fields()[0].status() {
+    @engine.FieldStatus::Resolved => ()
+    _ => fail("claim should resolve inside its source chunk")
+  }
+  assert_eq(report.fields()[0].evidence()[0].span().start(), 0)
+  assert_eq(report.fields()[0].source_chunk().unwrap().index(), 0)
+}
+
+///|
+test "claim outside its source chunk is rejected" {
+  let document = engine_test_document("duplicate", "晨星\n---\n晨星")
+  let source = @engine.ClaimSource::new(index=1, start=2, end=5)
+  let fields = [
+    @engine.FieldDefinition::new(name="party", description="签约方"),
+  ]
+  let claims = [
+    @engine.LlmClaim::new(
+      field="party",
+      value="晨星",
+      quote="晨星",
+      source~,
+    ),
+  ]
+  let report = engine_test_report(document, fields, claims)
+  match report.fields()[0].status() {
+    @engine.FieldStatus::MissingSource => ()
+    _ => fail("claim must not bind outside its source chunk")
+  }
+  match report.diagnostics()[0] {
+    @engine.Diagnostic::SourceOutsideChunk("party", "晨星", 1) => ()
+    _ => fail("source-outside-chunk diagnostic should be emitted")
+  }
+}
+
+///|
+test "unknown claim field is diagnosed without creating a result" {
+  let document = engine_test_document("contract", "甲方：晨星")
+  let fields = [
+    @engine.FieldDefinition::new(name="party", description="签约方"),
+  ]
+  let claims = [
+    @engine.LlmClaim::new(
+      field="billing_address",
+      value="晨星",
+      quote="晨星",
+    ),
+  ]
+  let report = engine_test_report(document, fields, claims)
+  assert_eq(report.fields().length(), 0)
+  match report.diagnostics()[0] {
+    @engine.Diagnostic::UnknownField("billing_address") => ()
+    _ => fail("unknown field should be diagnosed")
+  }
+}
+
+///|
+test "text value that cannot be proven is marked unverified" {
+  let document = engine_test_document("ticket", "根因：证书过期")
+  let fields = [
+    @engine.FieldDefinition::new(name="root_cause", description="根因"),
+  ]
+  let claims = [
+    @engine.LlmClaim::new(
+      field="root_cause",
+      value="TLS 证书过期",
+      quote="证书过期",
+    ),
+  ]
+  let report = engine_test_report(document, fields, claims)
+  match report.fields()[0].value_consistency() {
+    @engine.ValueConsistency::Unverified => ()
+    _ => fail("text consistency should be unverified")
+  }
+  match report.diagnostics()[0] {
+    @engine.Diagnostic::ValueUnverified(
+      "root_cause",
+      "TLS 证书过期",
+      "证书过期"
+    ) => ()
+    _ => fail("text value should be marked unverified")
+  }
+}
+
+///|
+test "overlapping chunk resolves a boundary-crossing quote" {
+  let document = engine_test_document("boundary", "0123456789ABCDE")
+  let source = @engine.ClaimSource::new(index=1, start=7, end=17)
+  let fields = [@engine.FieldDefinition::new(name="code", description="编码")]
+  let claims = [
+    @engine.LlmClaim::new(field="code", value="89AB", quote="89AB", source~),
+  ]
+  let report = engine_test_report(document, fields, claims)
+  match report.fields()[0].status() {
+    @engine.FieldStatus::Resolved => ()
+    _ => fail("overlap should contain the complete quote")
+  }
+  assert_eq(report.fields()[0].evidence()[0].span().start(), 8)
+  assert_eq(report.fields()[0].evidence()[0].span().end(), 12)
+}
+
+///|
+test "overlapping chunks deduplicate the same resolved evidence" {
+  let document = engine_test_document("duplicate", "晨星\n---\n晨星")
+  let fields = [
+    @engine.FieldDefinition::new(name="party", description="签约方"),
+  ]
+  let claims = [
+    @engine.LlmClaim::new(
+      field="party",
+      value="晨星",
+      quote="晨星",
+      source=@engine.ClaimSource::new(index=0, start=0, end=5),
+    ),
+    @engine.LlmClaim::new(
+      field="party",
+      value="晨星",
+      quote="晨星",
+      source=@engine.ClaimSource::new(index=1, start=0, end=5),
+    ),
+  ]
+  let report = engine_test_report(document, fields, claims)
+  assert_eq(report.fields().length(), 1)
+  assert_eq(report.fields()[0].evidence().length(), 1)
+}
