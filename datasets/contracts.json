@@ -6,19 +6,22 @@
       "name": "party",
       "description": "合同签约方",
       "required": true,
-      "repeatable": true
+      "repeatable": true,
+      "value_kind": "text"
     },
     {
       "name": "amount",
       "description": "合同金额",
       "required": true,
-      "repeatable": false
+      "repeatable": false,
+      "value_kind": "number"
     },
     {
       "name": "notice_days",
       "description": "终止通知提前天数",
       "required": false,
-      "repeatable": false
+      "repeatable": false,
+      "value_kind": "number"
     }
   ],
   "cases": [
@@ -52,8 +55,10 @@
         {
           "field": "party",
           "value": "上海晨星科技有限公司",
+          "normalized_value": "上海晨星科技有限公司",
           "quote": "上海晨星科技有限公司",
           "status": "resolved",
+          "value_consistency": "verified",
           "evidence": [
             {
               "start": 20,
@@ -64,8 +69,10 @@
         {
           "field": "party",
           "value": "北京远山数据有限公司",
+          "normalized_value": "北京远山数据有限公司",
           "quote": "北京远山数据有限公司",
           "status": "resolved",
+          "value_consistency": "verified",
           "evidence": [
             {
               "start": 34,
@@ -76,8 +83,10 @@
         {
           "field": "amount",
           "value": "120000 元",
+          "normalized_value": "120000",
           "quote": "120,000 元",
           "status": "resolved",
+          "value_consistency": "verified",
           "evidence": [
             {
               "start": 55,
@@ -88,8 +97,10 @@
         {
           "field": "notice_days",
           "value": "30 日",
+          "normalized_value": "30",
           "quote": "30 日",
           "status": "resolved",
+          "value_consistency": "verified",
           "evidence": [
             {
               "start": 131,
@@ -97,7 +108,8 @@
             }
           ]
         }
-      ]
+      ],
+      "expected_diagnostics": []
     },
     {
       "id": "contract-b",
@@ -123,8 +135,10 @@
         {
           "field": "party",
           "value": "远山数据有限公司",
+          "normalized_value": "远山数据有限公司",
           "quote": "远山数据有限公司",
           "status": "resolved",
+          "value_consistency": "verified",
           "evidence": [
             {
               "start": 20,
@@ -135,8 +149,10 @@
         {
           "field": "amount",
           "value": "100000 元",
+          "normalized_value": "100000",
           "quote": "100,000 元",
           "status": "conflict",
+          "value_consistency": "verified",
           "evidence": [
             {
               "start": 34,
@@ -147,14 +163,22 @@
         {
           "field": "amount",
           "value": "120000 元",
+          "normalized_value": "120000",
           "quote": "120,000 元",
           "status": "conflict",
+          "value_consistency": "verified",
           "evidence": [
             {
               "start": 49,
               "end": 58
             }
           ]
+        }
+      ],
+      "expected_diagnostics": [
+        {
+          "code": "field_conflict",
+          "field": "amount"
         }
       ]
     },
@@ -177,8 +201,10 @@
         {
           "field": "party",
           "value": "晨星",
+          "normalized_value": "晨星",
           "quote": "晨星",
           "status": "ambiguous_source",
+          "value_consistency": "unverified",
           "evidence": [
             {
               "start": 20,
@@ -193,14 +219,164 @@
         {
           "field": "amount",
           "value": "50000 元",
+          "normalized_value": "50000",
           "quote": "50,000 元",
           "status": "resolved",
+          "value_consistency": "verified",
           "evidence": [
             {
               "start": 35,
               "end": 43
             }
           ]
+        }
+      ],
+      "expected_diagnostics": [
+        {
+          "code": "ambiguous_source",
+          "field": "party"
+        }
+      ]
+    },
+    {
+      "id": "contract-d",
+      "document": "合同编号：HT-2026-004\n甲方：星辰公司\n合同总金额：80,000 元\n备注：联系电话仅用于合同送达。",
+      "claims": [
+        {
+          "field": "party",
+          "value": "星辰公司",
+          "quote": "星辰公司"
+        },
+        {
+          "field": "amount",
+          "value": "80000 元",
+          "quote": "80,000 元"
+        },
+        {
+          "field": "billing_address",
+          "value": "联系电话仅用于合同送达",
+          "quote": "联系电话仅用于合同送达"
+        }
+      ],
+      "expected": [
+        {
+          "field": "party",
+          "value": "星辰公司",
+          "normalized_value": "星辰公司",
+          "quote": "星辰公司",
+          "status": "resolved",
+          "value_consistency": "verified",
+          "evidence": [
+            {
+              "start": 20,
+              "end": 24
+            }
+          ]
+        },
+        {
+          "field": "amount",
+          "value": "80000 元",
+          "normalized_value": "80000",
+          "quote": "80,000 元",
+          "status": "resolved",
+          "value_consistency": "verified",
+          "evidence": [
+            {
+              "start": 31,
+              "end": 39
+            }
+          ]
+        }
+      ],
+      "expected_diagnostics": [
+        {
+          "code": "unknown_field",
+          "field": "billing_address"
+        }
+      ]
+    },
+    {
+      "id": "contract-e",
+      "document": "合同编号：HT-2026-005\n甲方：星河公司\n合同总金额：120,000 元",
+      "claims": [
+        {
+          "field": "party",
+          "value": "星河公司",
+          "quote": "星河公司"
+        },
+        {
+          "field": "amount",
+          "value": "999999 元",
+          "quote": "120,000 元"
+        }
+      ],
+      "expected": [
+        {
+          "field": "party",
+          "value": "星河公司",
+          "normalized_value": "星河公司",
+          "quote": "星河公司",
+          "status": "resolved",
+          "value_consistency": "verified",
+          "evidence": [
+            {
+              "start": 20,
+              "end": 24
+            }
+          ]
+        },
+        {
+          "field": "amount",
+          "value": "999999 元",
+          "normalized_value": "999999",
+          "quote": "120,000 元",
+          "status": "resolved",
+          "value_consistency": "mismatch",
+          "evidence": [
+            {
+              "start": 31,
+              "end": 40
+            }
+          ]
+        }
+      ],
+      "expected_diagnostics": [
+        {
+          "code": "value_mismatch",
+          "field": "amount"
+        }
+      ]
+    },
+    {
+      "id": "contract-f",
+      "document": "合同编号：HT-2026-006\n甲方：云帆公司\n备注：金额待补充。",
+      "claims": [
+        {
+          "field": "party",
+          "value": "云帆公司",
+          "quote": "云帆公司"
+        }
+      ],
+      "expected": [
+        {
+          "field": "party",
+          "value": "云帆公司",
+          "normalized_value": "云帆公司",
+          "quote": "云帆公司",
+          "status": "resolved",
+          "value_consistency": "verified",
+          "evidence": [
+            {
+              "start": 20,
+              "end": 24
+            }
+          ]
+        }
+      ],
+      "expected_diagnostics": [
+        {
+          "code": "missing_required_field",
+          "field": "amount"
         }
       ]
     }

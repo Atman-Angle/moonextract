@@ -6,25 +6,29 @@
       "name": "service",
       "description": "受影响服务",
       "required": true,
-      "repeatable": true
+      "repeatable": true,
+      "value_kind": "text"
     },
     {
       "name": "severity",
       "description": "故障级别",
       "required": true,
-      "repeatable": false
+      "repeatable": false,
+      "value_kind": "text"
     },
     {
       "name": "root_cause",
       "description": "根因",
       "required": true,
-      "repeatable": false
+      "repeatable": false,
+      "value_kind": "text"
     },
     {
       "name": "region",
       "description": "影响区域",
       "required": false,
-      "repeatable": false
+      "repeatable": false,
+      "value_kind": "text"
     }
   ],
   "cases": [
@@ -57,8 +61,10 @@
         {
           "field": "service",
           "value": "支付网关",
+          "normalized_value": "支付网关",
           "quote": "支付网关",
           "status": "resolved",
+          "value_consistency": "verified",
           "evidence": [
             {
               "start": 16,
@@ -69,8 +75,10 @@
         {
           "field": "severity",
           "value": "P1",
+          "normalized_value": "P1",
           "quote": "P1",
           "status": "resolved",
+          "value_consistency": "verified",
           "evidence": [
             {
               "start": 26,
@@ -81,8 +89,10 @@
         {
           "field": "root_cause",
           "value": "TLS 证书过期",
+          "normalized_value": "TLS 证书过期",
           "quote": "证书过期",
           "status": "resolved",
+          "value_consistency": "unverified",
           "evidence": [
             {
               "start": 52,
@@ -93,14 +103,22 @@
         {
           "field": "region",
           "value": "华东",
+          "normalized_value": "华东",
           "quote": "华东",
           "status": "resolved",
+          "value_consistency": "verified",
           "evidence": [
             {
               "start": 34,
               "end": 36
             }
           ]
+        }
+      ],
+      "expected_diagnostics": [
+        {
+          "code": "value_unverified",
+          "field": "root_cause"
         }
       ]
     },
@@ -133,8 +151,10 @@
         {
           "field": "service",
           "value": "订单服务",
+          "normalized_value": "订单服务",
           "quote": "订单服务",
           "status": "resolved",
+          "value_consistency": "verified",
           "evidence": [
             {
               "start": 16,
@@ -145,8 +165,10 @@
         {
           "field": "severity",
           "value": "P1",
+          "normalized_value": "P1",
           "quote": "P1",
           "status": "conflict",
+          "value_consistency": "verified",
           "evidence": [
             {
               "start": 26,
@@ -157,8 +179,10 @@
         {
           "field": "severity",
           "value": "P2",
+          "normalized_value": "P2",
           "quote": "P2",
           "status": "conflict",
+          "value_consistency": "verified",
           "evidence": [
             {
               "start": 34,
@@ -169,14 +193,22 @@
         {
           "field": "root_cause",
           "value": "库存扣减失败",
+          "normalized_value": "库存扣减失败",
           "quote": "库存扣减失败",
           "status": "resolved",
+          "value_consistency": "verified",
           "evidence": [
             {
               "start": 40,
               "end": 46
             }
           ]
+        }
+      ],
+      "expected_diagnostics": [
+        {
+          "code": "field_conflict",
+          "field": "severity"
         }
       ]
     },
@@ -197,15 +229,18 @@
         {
           "field": "root_cause",
           "value": "数据库连接池耗尽",
-          "quote": "数据库连接池耗尽"
+          "quote": "数据库连接池耗尽",
+          "emit_regardless": true
         }
       ],
       "expected": [
         {
           "field": "service",
           "value": "支付网关",
+          "normalized_value": "支付网关",
           "quote": "支付网关",
           "status": "resolved",
+          "value_consistency": "verified",
           "evidence": [
             {
               "start": 16,
@@ -216,8 +251,10 @@
         {
           "field": "severity",
           "value": "P2",
+          "normalized_value": "P2",
           "quote": "P2",
           "status": "resolved",
+          "value_consistency": "verified",
           "evidence": [
             {
               "start": 26,
@@ -228,9 +265,69 @@
         {
           "field": "root_cause",
           "value": "数据库连接池耗尽",
+          "normalized_value": "数据库连接池耗尽",
           "quote": "数据库连接池耗尽",
           "status": "missing_source",
+          "value_consistency": "unverified",
           "evidence": []
+        }
+      ],
+      "expected_diagnostics": [
+        {
+          "code": "missing_source",
+          "field": "root_cause"
+        }
+      ]
+    },
+    {
+      "id": "ticket-e",
+      "document": "工单号：SUP-1045\n服务：搜索服务\n严重级别：P2\n现象：查询超时",
+      "claims": [
+        {
+          "field": "service",
+          "value": "搜索服务",
+          "quote": "搜索服务"
+        },
+        {
+          "field": "severity",
+          "value": "P2",
+          "quote": "P2"
+        }
+      ],
+      "expected": [
+        {
+          "field": "service",
+          "value": "搜索服务",
+          "normalized_value": "搜索服务",
+          "quote": "搜索服务",
+          "status": "resolved",
+          "value_consistency": "verified",
+          "evidence": [
+            {
+              "start": 16,
+              "end": 20
+            }
+          ]
+        },
+        {
+          "field": "severity",
+          "value": "P2",
+          "normalized_value": "P2",
+          "quote": "P2",
+          "status": "resolved",
+          "value_consistency": "verified",
+          "evidence": [
+            {
+              "start": 26,
+              "end": 28
+            }
+          ]
+        }
+      ],
+      "expected_diagnostics": [
+        {
+          "code": "missing_required_field",
+          "field": "root_cause"
         }
       ]
     }

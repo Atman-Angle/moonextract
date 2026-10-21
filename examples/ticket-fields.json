@@ -1,8 +1,32 @@
 {
   "fields": [
-    { "name": "service", "description": "受影响服务", "required": true, "repeatable": true },
-    { "name": "severity", "description": "故障级别", "required": true, "repeatable": false },
-    { "name": "root_cause", "description": "根因", "required": true, "repeatable": false },
-    { "name": "region", "description": "影响区域", "required": false, "repeatable": false }
+    {
+      "name": "service",
+      "description": "受影响服务",
+      "required": true,
+      "repeatable": true,
+      "value_kind": "text"
+    },
+    {
+      "name": "severity",
+      "description": "故障级别",
+      "required": true,
+      "repeatable": false,
+      "value_kind": "text"
+    },
+    {
+      "name": "root_cause",
+      "description": "根因",
+      "required": true,
+      "repeatable": false,
+      "value_kind": "text"
+    },
+    {
+      "name": "region",
+      "description": "影响区域",
+      "required": false,
+      "repeatable": false,
+      "value_kind": "text"
+    }
   ]
 }

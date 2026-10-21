@@ -1,7 +1,25 @@
 {
   "fields": [
-    { "name": "party", "description": "合同签约方", "required": true, "repeatable": true },
-    { "name": "amount", "description": "合同总金额", "required": true, "repeatable": false },
-    { "name": "notice_days", "description": "终止通知提前天数", "required": false, "repeatable": false }
+    {
+      "name": "party",
+      "description": "合同签约方",
+      "required": true,
+      "repeatable": true,
+      "value_kind": "text"
+    },
+    {
+      "name": "amount",
+      "description": "合同总金额",
+      "required": true,
+      "repeatable": false,
+      "value_kind": "number"
+    },
+    {
+      "name": "notice_days",
+      "description": "终止通知提前天数",
+      "required": false,
+      "repeatable": false,
+      "value_kind": "number"
+    }
   ]
 }

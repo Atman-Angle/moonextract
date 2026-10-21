@@ -36,7 +36,7 @@ TICKET_CLAIMS = {
     "claims": [
         {"field": "service", "value": "支付网关", "quote": "支付网关"},
         {"field": "severity", "value": "P1", "quote": "P1"},
-        {"field": "root_cause", "value": "TLS 证书过期", "quote": "证书过期"},
+        {"field": "root_cause", "value": "证书过期", "quote": "证书过期"},
         {"field": "region", "value": "华东", "quote": "华东"},
     ]
 }
