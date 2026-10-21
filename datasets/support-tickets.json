@@ -1,0 +1,238 @@
+{
+  "scenario": "support-tickets",
+  "description": "客服工单结构化分诊与根因证据",
+  "fields": [
+    {
+      "name": "service",
+      "description": "受影响服务",
+      "required": true,
+      "repeatable": true
+    },
+    {
+      "name": "severity",
+      "description": "故障级别",
+      "required": true,
+      "repeatable": false
+    },
+    {
+      "name": "root_cause",
+      "description": "根因",
+      "required": true,
+      "repeatable": false
+    },
+    {
+      "name": "region",
+      "description": "影响区域",
+      "required": false,
+      "repeatable": false
+    }
+  ],
+  "cases": [
+    {
+      "id": "ticket-a",
+      "document": "工单号：SUP-1042\n服务：支付网关\n严重级别：P1\n影响区域：华东\n现象：支付回调偶发失败\n根因：证书过期",
+      "claims": [
+        {
+          "field": "service",
+          "value": "支付网关",
+          "quote": "支付网关"
+        },
+        {
+          "field": "severity",
+          "value": "P1",
+          "quote": "P1"
+        },
+        {
+          "field": "root_cause",
+          "value": "TLS 证书过期",
+          "quote": "证书过期"
+        },
+        {
+          "field": "region",
+          "value": "华东",
+          "quote": "华东"
+        }
+      ],
+      "expected": [
+        {
+          "field": "service",
+          "value": "支付网关",
+          "quote": "支付网关",
+          "status": "resolved",
+          "evidence": [
+            {
+              "start": 16,
+              "end": 20
+            }
+          ]
+        },
+        {
+          "field": "severity",
+          "value": "P1",
+          "quote": "P1",
+          "status": "resolved",
+          "evidence": [
+            {
+              "start": 26,
+              "end": 28
+            }
+          ]
+        },
+        {
+          "field": "root_cause",
+          "value": "TLS 证书过期",
+          "quote": "证书过期",
+          "status": "resolved",
+          "evidence": [
+            {
+              "start": 52,
+              "end": 56
+            }
+          ]
+        },
+        {
+          "field": "region",
+          "value": "华东",
+          "quote": "华东",
+          "status": "resolved",
+          "evidence": [
+            {
+              "start": 34,
+              "end": 36
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ticket-b",
+      "document": "工单号：SUP-1043\n服务：订单服务\n初判级别：P1\n复判级别：P2\n根因：库存扣减失败",
+      "claims": [
+        {
+          "field": "service",
+          "value": "订单服务",
+          "quote": "订单服务"
+        },
+        {
+          "field": "severity",
+          "value": "P1",
+          "quote": "P1"
+        },
+        {
+          "field": "severity",
+          "value": "P2",
+          "quote": "P2"
+        },
+        {
+          "field": "root_cause",
+          "value": "库存扣减失败",
+          "quote": "库存扣减失败"
+        }
+      ],
+      "expected": [
+        {
+          "field": "service",
+          "value": "订单服务",
+          "quote": "订单服务",
+          "status": "resolved",
+          "evidence": [
+            {
+              "start": 16,
+              "end": 20
+            }
+          ]
+        },
+        {
+          "field": "severity",
+          "value": "P1",
+          "quote": "P1",
+          "status": "conflict",
+          "evidence": [
+            {
+              "start": 26,
+              "end": 28
+            }
+          ]
+        },
+        {
+          "field": "severity",
+          "value": "P2",
+          "quote": "P2",
+          "status": "conflict",
+          "evidence": [
+            {
+              "start": 34,
+              "end": 36
+            }
+          ]
+        },
+        {
+          "field": "root_cause",
+          "value": "库存扣减失败",
+          "quote": "库存扣减失败",
+          "status": "resolved",
+          "evidence": [
+            {
+              "start": 40,
+              "end": 46
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ticket-c",
+      "document": "工单号：SUP-1044\n服务：支付网关\n严重级别：P2\n现象：重试导致重复扣款\n根因：幂等键缺失",
+      "claims": [
+        {
+          "field": "service",
+          "value": "支付网关",
+          "quote": "支付网关"
+        },
+        {
+          "field": "severity",
+          "value": "P2",
+          "quote": "P2"
+        },
+        {
+          "field": "root_cause",
+          "value": "数据库连接池耗尽",
+          "quote": "数据库连接池耗尽"
+        }
+      ],
+      "expected": [
+        {
+          "field": "service",
+          "value": "支付网关",
+          "quote": "支付网关",
+          "status": "resolved",
+          "evidence": [
+            {
+              "start": 16,
+              "end": 20
+            }
+          ]
+        },
+        {
+          "field": "severity",
+          "value": "P2",
+          "quote": "P2",
+          "status": "resolved",
+          "evidence": [
+            {
+              "start": 26,
+              "end": 28
+            }
+          ]
+        },
+        {
+          "field": "root_cause",
+          "value": "数据库连接池耗尽",
+          "quote": "数据库连接池耗尽",
+          "status": "missing_source",
+          "evidence": []
+        }
+      ]
+    }
+  ]
+}

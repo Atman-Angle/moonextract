@@ -1,0 +1,208 @@
+{
+  "scenario": "contracts",
+  "description": "合同条款抽取与证据消歧",
+  "fields": [
+    {
+      "name": "party",
+      "description": "合同签约方",
+      "required": true,
+      "repeatable": true
+    },
+    {
+      "name": "amount",
+      "description": "合同金额",
+      "required": true,
+      "repeatable": false
+    },
+    {
+      "name": "notice_days",
+      "description": "终止通知提前天数",
+      "required": false,
+      "repeatable": false
+    }
+  ],
+  "cases": [
+    {
+      "id": "contract-a",
+      "document": "合同编号：HT-2026-001\n甲方：上海晨星科技有限公司\n乙方：北京远山数据有限公司\n合同总金额：人民币 120,000 元\n付款节点：合同签署后 10 个工作日内支付 40%\n违约条款：逾期交付超过 30 日，甲方有权解除合同。\n终止通知：任何一方应提前 30 日书面通知。",
+      "claims": [
+        {
+          "field": "party",
+          "value": "上海晨星科技有限公司",
+          "quote": "上海晨星科技有限公司"
+        },
+        {
+          "field": "party",
+          "value": "北京远山数据有限公司",
+          "quote": "北京远山数据有限公司"
+        },
+        {
+          "field": "amount",
+          "value": "120000 元",
+          "quote": "120,000 元"
+        },
+        {
+          "field": "notice_days",
+          "value": "30 日",
+          "quote": "30 日",
+          "context": "终止通知"
+        }
+      ],
+      "expected": [
+        {
+          "field": "party",
+          "value": "上海晨星科技有限公司",
+          "quote": "上海晨星科技有限公司",
+          "status": "resolved",
+          "evidence": [
+            {
+              "start": 20,
+              "end": 30
+            }
+          ]
+        },
+        {
+          "field": "party",
+          "value": "北京远山数据有限公司",
+          "quote": "北京远山数据有限公司",
+          "status": "resolved",
+          "evidence": [
+            {
+              "start": 34,
+              "end": 44
+            }
+          ]
+        },
+        {
+          "field": "amount",
+          "value": "120000 元",
+          "quote": "120,000 元",
+          "status": "resolved",
+          "evidence": [
+            {
+              "start": 55,
+              "end": 64
+            }
+          ]
+        },
+        {
+          "field": "notice_days",
+          "value": "30 日",
+          "quote": "30 日",
+          "status": "resolved",
+          "evidence": [
+            {
+              "start": 131,
+              "end": 135
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "contract-b",
+      "document": "合同编号：HT-2026-002\n甲方：远山数据有限公司\n初审金额：100,000 元\n终审金额：120,000 元",
+      "claims": [
+        {
+          "field": "party",
+          "value": "远山数据有限公司",
+          "quote": "远山数据有限公司"
+        },
+        {
+          "field": "amount",
+          "value": "100000 元",
+          "quote": "100,000 元"
+        },
+        {
+          "field": "amount",
+          "value": "120000 元",
+          "quote": "120,000 元"
+        }
+      ],
+      "expected": [
+        {
+          "field": "party",
+          "value": "远山数据有限公司",
+          "quote": "远山数据有限公司",
+          "status": "resolved",
+          "evidence": [
+            {
+              "start": 20,
+              "end": 28
+            }
+          ]
+        },
+        {
+          "field": "amount",
+          "value": "100000 元",
+          "quote": "100,000 元",
+          "status": "conflict",
+          "evidence": [
+            {
+              "start": 34,
+              "end": 43
+            }
+          ]
+        },
+        {
+          "field": "amount",
+          "value": "120000 元",
+          "quote": "120,000 元",
+          "status": "conflict",
+          "evidence": [
+            {
+              "start": 49,
+              "end": 58
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "contract-c",
+      "document": "合同编号：HT-2026-003\n甲方：晨星\n乙方：晨星\n合同总金额：50,000 元",
+      "claims": [
+        {
+          "field": "party",
+          "value": "晨星",
+          "quote": "晨星"
+        },
+        {
+          "field": "amount",
+          "value": "50000 元",
+          "quote": "50,000 元"
+        }
+      ],
+      "expected": [
+        {
+          "field": "party",
+          "value": "晨星",
+          "quote": "晨星",
+          "status": "ambiguous_source",
+          "evidence": [
+            {
+              "start": 20,
+              "end": 22
+            },
+            {
+              "start": 26,
+              "end": 28
+            }
+          ]
+        },
+        {
+          "field": "amount",
+          "value": "50000 元",
+          "quote": "50,000 元",
+          "status": "resolved",
+          "evidence": [
+            {
+              "start": 35,
+              "end": 43
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
