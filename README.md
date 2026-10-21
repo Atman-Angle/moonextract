@@ -23,11 +23,14 @@ The current `v0.2` alpha includes:
 - OpenAI-compatible chat-completions adapter;
 - structured claim parsing;
 - evidence resolution with raw value, normalized value, quote, and spans;
+- explicit `verified`, `unverified`, and `mismatch` value consistency states;
 - context-based disambiguation for repeated source text;
 - missing-source, ambiguous-source, and non-repeatable field conflict diagnostics;
-- overlapping chunk extraction and claim deduplication;
-- two business data sets and a value-only exact-match baseline;
-- 57 MoonBit tests and a native evaluation command.
+- chunk-aware claim resolution that rejects evidence outside its source chunk;
+- overlapping chunk extraction and post-resolution claim deduplication;
+- contract and support-ticket data sets with negative cases;
+- a value-only exact-match baseline with explicit input restrictions;
+- 65 MoonBit tests and a native evaluation command.
 
 See [Extraction Engine](docs/ENGINE.md) and [Evaluation](docs/EVALUATION.md).
 
@@ -134,13 +137,14 @@ claim about a particular model's quality.
 
 ## Evaluation
 
-The checked-in data sets compare MoonExtract against a baseline that uses only
-the model's `value` with exact string matching:
+The checked-in data sets compare MoonExtract against a baseline that may use
+only the field name, the model's `value`, and the document. It has no access to
+`quote`, `context`, source-chunk metadata, conflict policy, or evidence labels:
 
-| Scenario | Engine correct | Baseline correct | Expected |
-| --- | ---: | ---: | ---: |
-| Contracts | 9 | 4 | 9 |
-| Support tickets | 11 | 8 | 11 |
+| Scenario | Engine value | Engine evidence | Baseline value | Baseline evidence | Expected |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Contracts | 14/14 | 14/14 | 7/14 | 7/14 | 14 fields |
+| Support tickets | 13/13 | 12/12 | 10/13 | 9/12 | 13 fields, 12 with evidence |
 
 The fixtures cover normalized values, repeated parties, context disambiguation,
 field conflicts, ambiguous sources, missing sources, and chunk merging.
@@ -161,14 +165,20 @@ recoverable input errors with `Result` and keeps model-level failures explicit.
 
 Field results use these states:
 
-- `resolved`: exactly one quote occurrence was selected;
-- `missing_source`: the quote is absent or its context does not match;
+- `resolved`: exactly one quote occurrence was selected inside the source chunk;
+- `missing_source`: the quote is absent, outside its source chunk, or its context does not match;
 - `ambiguous_source`: multiple quote occurrences remain after context filtering;
 - `conflict`: a non-repeatable field has different normalized values.
 
+`resolved` means evidence was resolved. It does not by itself prove that the
+stored value and quote agree. `value_consistency` is reported separately as
+`verified`, `unverified`, or `mismatch`. Numeric fields use a narrow numeric
+normalizer; text fields are copied from a quote only when normalized text is
+equal, otherwise they remain explicitly unverified.
+
 The report also carries stable diagnostics and the number of overlapping chunks
-used for extraction. A repeated claim from overlapping chunks is deduplicated by
-field, value, quote, and context.
+used for extraction. A claim retains its source chunk, and a quote outside that
+chunk is rejected instead of being rebound elsewhere in the document.
 
 ## Scope
 
