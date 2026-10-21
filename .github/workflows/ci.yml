@@ -45,8 +45,13 @@ jobs:
           from pathlib import Path
           result = json.loads(Path("/tmp/moonextract-eval.json").read_text(encoding="utf-8"))
           for scenario in result:
-              assert scenario["summary"]["engine_accuracy"] == 1.0, scenario
-          print("evaluation: engine accuracy 1.0 on both submitted scenarios")
+              engine = scenario["summary"]["engine"]
+              assert engine["value_accuracy"] == 1.0, scenario
+              assert engine["evidence_accuracy"] == 1.0, scenario
+              assert engine["false_positives"] == 0, scenario
+              assert engine["false_negatives"] == 0, scenario
+              assert engine["diagnostics_unexpected"] == 0, scenario
+          print("evaluation: field, evidence, and diagnostic checks passed")
           PY
 
       - name: Verify OpenAI-compatible transport
